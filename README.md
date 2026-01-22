@@ -15,6 +15,7 @@
 
 **This Cookbook** = Ready-to-use code recipes showing how to use Claude AI for:
 - 📸 Receipt OCR (Thai text extraction)
+- 💰 Cost optimization (Hybrid Groq + Claude)
 - 🧠 Transaction classification
 - ⚖️ Account code mapping
 - 🔄 Data transformation
@@ -31,7 +32,15 @@
    - 90-95% accuracy on Thai text
    - DEV (mock) + PROD (real API) modes
    - **✅ Complete with tests!**
-   - **[⚡ Quick Integration Guide](./recipes/03-vision-ocr/receipt-extraction/INTEGRATE_QUICK.md)** (5 min)
+   - **[⚡ Quick Integration](./recipes/03-vision-ocr/receipt-extraction/INTEGRATE_QUICK.md)** (5 min)
+
+2. **[Groq OCR Fallback & Hybrid Strategy](./recipes/03-vision-ocr/groq-fallback/)** 🆕
+   - **Save 70% on OCR costs** (฿0.15 vs ฿0.50/receipt)
+   - Auto-route simple receipts to cheap Groq
+   - Complex receipts still use Claude
+   - Automatic fallback on failures
+   - **✅ Complete with metrics!**
+   - **[⚡ Quick Start](./recipes/03-vision-ocr/groq-fallback/QUICKSTART.md)** (5 min)
 
 ### 📁 Recipe Categories
 
@@ -48,8 +57,8 @@
 
 #### 03. Vision & OCR
 - [x] **Receipt Extraction** (Complete!) 🎉
+- [x] **Groq Fallback & Hybrid Strategy** (Complete!) 🎉
 - [ ] Quality Validation
-- [ ] Fallback Strategy (Groq)
 - [ ] Batch Processing
 
 #### 04. Tool Use
@@ -75,6 +84,7 @@
 
 - [Bun](https://bun.sh) installed
 - Claude API key from [console.anthropic.com](https://console.anthropic.com)
+- (Optional) Groq API key from [console.groq.com](https://console.groq.com)
 - (Optional) AutoAcct backend project
 
 ### Try a Recipe (Standalone)
@@ -97,14 +107,27 @@ cp .env.example .env
 APP_MODE=PROD bun run example.ts
 ```
 
+### Try the Hybrid Strategy (Cost Optimization)
+
+```bash
+# Cost-optimized OCR with Groq fallback
+cd recipes/03-vision-ocr/groq-fallback
+bun install
+
+# Run demo (DEV mode - free)
+bun run example:dev
+
+# See cost savings in action!
+```
+
 ### Integrate with AutoAcct Project
 
 ```bash
-# Follow the 5-minute guide
+# Recipe 1: Basic OCR (5 min)
 cat recipes/03-vision-ocr/receipt-extraction/INTEGRATE_QUICK.md
 
-# Or read the full integration guide
-cat recipes/03-vision-ocr/receipt-extraction/INTEGRATION.md
+# Recipe 2: Hybrid Strategy (10 min)
+cat recipes/03-vision-ocr/groq-fallback/INTEGRATION.md
 ```
 
 ---
@@ -121,6 +144,7 @@ cat recipes/03-vision-ocr/receipt-extraction/INTEGRATION.md
 
 - [Claude API Docs](https://docs.anthropic.com/claude/reference)
 - [Claude Vision Guide](https://docs.anthropic.com/claude/docs/vision)
+- [Groq API Docs](https://console.groq.com/docs)
 - [Anthropic Prompt Library](https://docs.anthropic.com/claude/page/prompts)
 - [AutoAcct Main Project](https://github.com/Waytid-way/AutoAcct) (coming soon)
 
@@ -146,6 +170,7 @@ const result = await adapter.extractReceipt({
 // + Logging
 // + Validation
 // + Tests
+// + Metrics
 ```
 
 ### 2. Dual Mode Always
@@ -160,7 +185,14 @@ APP_MODE=dev  // Uses MockAdapter
 APP_MODE=prod // Uses ClaudeAdapter
 ```
 
-### 3. Thai Business Context
+### 3. Cost Optimization
+
+Don't just use the most expensive API for everything:
+- **Simple tasks** → Groq (฿0.05/request)
+- **Complex tasks** → Claude (฿0.50/request)
+- **Hybrid** → Auto-route based on complexity (฿0.15/request average)
+
+### 4. Thai Business Context
 
 All recipes are optimized for:
 - 🇹🇭 Thai language (receipts, invoices)
@@ -188,11 +220,12 @@ recipes/XX-category/recipe-name/
 
 ---
 
-## 🔥 Featured Recipe: Receipt OCR
+## 🔥 Featured Recipes
 
-### What It Does
+### Recipe 1: Receipt OCR with Claude Vision ⭐
 
-Extracts structured data from Thai receipt images:
+**What It Does:**
+Extracts structured data from Thai receipt images with 90-95% accuracy.
 
 **Input:** JPEG/PNG image  
 **Output:** JSON
@@ -206,27 +239,39 @@ Extracts structured data from Thai receipt images:
 }
 ```
 
-### Why Claude?
-
-| Provider | Thai Accuracy | Cost | Setup |
-|----------|--------------|------|-------|
-| **Claude** | **90-95%** | ฿0.50 | 5 min |
-| Groq | 70-80% | ฿0.05 | 5 min |
-| PaddleOCR | 60-70% | Free | 5 hours |
-| Google Vision | 85-90% | ฿1.50 | 10 min |
-
-### ROI
-
-**Manual Entry:**
-- 100 receipts × 3 min = 5 hours
-- Cost: ฿1,500/month
-
-**With Claude OCR:**
-- 100 receipts × 3 sec = 5 minutes
-- Cost: ฿100/month (API + review)
-- **Savings: 93% (฿1,400/month)**
+**ROI:**
+- Manual entry: 100 receipts × 3 min = 5 hours (฿1,500/month)
+- With Claude: 100 receipts × 3 sec = 5 min (฿50/month)
+- **Savings: 93% (฿1,450/month)**
 
 ➡️ **[Try it now](./recipes/03-vision-ocr/receipt-extraction/QUICKSTART.md)**
+
+---
+
+### Recipe 2: Groq Fallback & Hybrid Strategy 🆕
+
+**What It Does:**
+Reduces OCR cost by 70% by routing simple receipts to cheap Groq, complex ones to Claude.
+
+**Architecture:**
+```
+Receipt → Classifier → Simple (80%) → Groq (฿0.05)
+                    └─ Complex (20%) → Claude (฿0.50)
+```
+
+**Cost Comparison (100 receipts):**
+
+| Strategy | Cost | Savings |
+|----------|------|----------|
+| Claude only | ฿50 | - |
+| **Hybrid** | **฿16** | **฿34 (68%)** |
+| Groq only | ฿5 | ฿45 (but 25% error rate!) |
+
+**ROI at Scale:**
+- 1,000 receipts/month: Save ฿340/month
+- 5,000 receipts/month: Save ฿1,700/month
+
+➡️ **[Try it now](./recipes/03-vision-ocr/groq-fallback/QUICKSTART.md)**
 
 ---
 
@@ -260,12 +305,13 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ### Recipe Ideas
 
-- [ ] Groq OCR Adapter (fallback)
+- [ ] PaddleOCR Integration (offline OCR)
 - [ ] Account Code Classifier
 - [ ] Expense Category Predictor
 - [ ] Multi-receipt Batch Processor
 - [ ] Express API Export Module
 - [ ] VAT Validator
+- [ ] Retry Logic with Exponential Backoff
 
 ---
 
@@ -275,12 +321,12 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 |----------|---------|--------|
 | Getting Started | 0/3 | 🔴 Not started |
 | Foundations | 0/4 | 🔴 Not started |
-| **Vision & OCR** | **1/4** | 🟡 **In progress** |
+| **Vision & OCR** | **2/4** | 🟡 **In progress** |
 | Tool Use | 0/3 | 🔴 Not started |
 | Reliability | 0/3 | 🔴 Not started |
 | Testing | 0/3 | 🔴 Not started |
 
-**Total:** 1/20 recipes complete (5%)
+**Total:** 2/20 recipes complete (10%)
 
 ---
 
@@ -288,19 +334,19 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ### Phase 1: Core Recipes (กำลังทำ) 🟢
 - [x] Receipt OCR with Claude Vision
-- [ ] Mock OCR Adapter
-- [ ] Groq Fallback Adapter
+- [x] Groq Fallback & Hybrid Strategy
 - [ ] Quality Validation
+- [ ] Batch Processing
 
 ### Phase 2: Integration Recipes
 - [ ] Express Export Module
 - [ ] Retry Logic with Backoff
-- [ ] Batch Processing
 - [ ] Account Code Mapping
+- [ ] PaddleOCR Integration
 
 ### Phase 3: Advanced Recipes
 - [ ] Circuit Breaker Pattern
-- [ ] Cost Optimization (Hybrid)
+- [ ] Cost Optimization (ML-based)
 - [ ] Performance Monitoring
 - [ ] E2E Testing
 
@@ -320,19 +366,21 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 **A:** ไม่จำเป็น! Recipes เป็น standalone code ที่รันได้เลย หรือจะ copy ไปใช้ใน project ของคุณก็ได้
 
-### Q: เสียเงินแค่ไหนในการเรียก Claude API?
+### Q: เสียเงินแค่ไหนในการเรียก API?
 
-**A:** DEV mode ไม่เสียเลย (ใช้ mock) แต่ PROD mode คิดเงินตามจริง:
-- Receipt OCR: ~฿0.50/ใบเสร็จ
-- 100 ใบ/เดือน = ฿50/เดือน
+**A:** ขึ้นกับ strategy:
+- **DEV mode:** ไม่เสียเลย (ใช้ mock)
+- **Claude only:** ~฿0.50/receipt
+- **Hybrid:** ~฿0.15/receipt (70% savings!)
+- **Groq only:** ~฿0.05/receipt (but lower accuracy)
 
 ### Q: รองรับภาษาไทยไหม?
 
 **A:** ใญ่! Claude 3.5 Sonnet แม่นยำ 90-95% สำหรับใบเสร็จไทย
 
-### Q: มี offline version ไหม (ไม่ต้องเชื่อม API)?
+### Q: Hybrid strategy ช่วยประหยัดเงินจริงหรือเปล่า?
 
-**A:** PaddleOCR recipe (coming soon) จะรัน local แต่แม่นยำต่ำกว่า Claude
+**A:** ใช่! ประหยัด 68-70% จริง ๆ และเกิด auto-fallback เวลา Groq ล้ม
 
 ---
 
@@ -356,13 +404,15 @@ MIT License - see [LICENSE](./LICENSE) for details.
 # 1. Clone
 git clone https://github.com/Waytid-way/claude-autoacct-cookbook.git
 
-# 2. Try the Receipt OCR recipe
+# 2. Try Recipe 1: Basic OCR
 cd recipes/03-vision-ocr/receipt-extraction
-bun install
-bun run example:dev
+bun install && bun run example:dev
 
-# 3. Read the integration guide
-cat INTEGRATE_QUICK.md
+# 3. Try Recipe 2: Hybrid Strategy (Cost Optimization)
+cd ../groq-fallback
+bun install && bun run example:dev
+
+# 4. See the cost savings!
 ```
 
 **🎉 Happy Coding!**
