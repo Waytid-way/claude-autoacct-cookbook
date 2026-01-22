@@ -1,0 +1,21 @@
+{
+  "name": "autoacct-receipt-ocr",
+  "version": "1.0.0",
+  "description": "Receipt OCR with Claude Vision for AutoAcct",
+  "type": "module",
+  "scripts": {
+    "test": "bun test test.ts",
+    "test:dev": "APP_MODE=DEV bun test test.ts",
+    "test:prod": "APP_MODE=PROD bun test test.ts",
+    "example": "bun run example.ts",
+    "example:dev": "APP_MODE=DEV bun run example.ts",
+    "example:prod": "APP_MODE=PROD bun run example.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
