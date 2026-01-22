@@ -1,0 +1,20 @@
+{
+  "name": "autoacct-groq-fallback",
+  "version": "1.0.0",
+  "description": "Hybrid OCR strategy with Groq fallback for cost optimization",
+  "type": "module",
+  "scripts": {
+    "test": "bun test test.ts",
+    "example": "bun run example.ts",
+    "example:dev": "APP_MODE=DEV bun run example.ts",
+    "example:prod": "APP_MODE=PROD bun run example.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/bun": "latest",
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
