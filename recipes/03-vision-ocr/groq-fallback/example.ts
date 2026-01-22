@@ -6,6 +6,7 @@
 
 import { HybridOcrStrategy } from './HybridOcrStrategy';
 import { GroqTextAdapter } from './GroqTextAdapter';
+import { MockGroqAdapter } from './MockGroqAdapter';
 import { createClaudeAdapter } from '../receipt-extraction/claudeAdapter';
 import type { AppConfig } from '../receipt-extraction/types';
 
@@ -33,7 +34,9 @@ console.log(`Groq: ${groqConfig.apiKey === 'mock-key' ? 'Mock' : 'Real API'}\n`)
 // ============================================================================
 
 const claudeAdapter = createClaudeAdapter(config);
-const groqAdapter = new GroqTextAdapter(groqConfig);
+const groqAdapter = (config.MODE === 'DEV'
+  ? new MockGroqAdapter()
+  : new GroqTextAdapter(groqConfig)) as any;
 
 const strategy = new HybridOcrStrategy(
   claudeAdapter as any,
