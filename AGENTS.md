@@ -10,7 +10,7 @@ Cookbook + workspace: Thai receipt OCR recipes and a running pipeline slice that
 - Running OCR by hand or benchmarking a model → `.pi/skills/receipt-ocr-node/`
 - Choosing a model (free list, measured results) → `docs/openrouter-vision-free.md`, `docs/vision-benchmark.md`
 - Writing a new recipe → `CONTRIBUTING.md`
-- Long-term direction (never MVP scope) → owner's blueprint file, kept outside this repo
+- Long-term direction (never MVP scope) → `docs/blueprints/` (conceptual blueprint + Phase 0 knowledge architecture; read when designing KB/evidence work)
 
 ## Run
 
