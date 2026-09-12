@@ -117,7 +117,40 @@ test('conf ต่ำกว่า minConf → needs-review พร้อมเห�
   }
 });
 
-// (3) ocr โยน error → log error ไม่ crash
+// (3) base ตรงยอด (total === base + vat) → ผ่านด้วย exact triple
+test('base ตรงยอด → exact triple ผ่าน', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    baseAmountSatang: 32710,
+    result: {
+      amountSatang: 35000, currency: 'THB', vatAmountSatang: 2290,
+      vendorName: 'x', issueDate: '2026-09-12', confidence: 0.99, rawText: 't',
+    },
+  });
+  const summary = await runPipeline({ ...sb, ocr });
+  assert.equal(summary.passed, 1);
+});
+
+// (4) base ไม่ลงยอด → needs-review (exact เหนือ fallback)
+test('base ไม่ลงยอด → needs-review เหตุผล vat', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    baseAmountSatang: 30000, // 30000+2290 != 35000
+    result: {
+      amountSatang: 35000, currency: 'THB', vatAmountSatang: 2290,
+      vendorName: 'x', issueDate: '2026-09-12', confidence: 0.99, rawText: 't',
+    },
+  });
+  const summary = await runPipeline({ ...sb, ocr });
+  assert.equal(summary.needsReview, 1);
+  const files = readdirSync(sb.reviewDir).filter((f) => f.endsWith('.json'));
+  const body = JSON.parse(readFileSync(join(sb.reviewDir, files[0]), 'utf8')) as { reasons: string[] };
+  assert.ok(body.reasons.join('; ').includes('vat cross-check'));
+});
+
+// (5) ocr โยน error → log error ไม่ crash
 test('ocr พัง → ลง audit stage error ไม่ crash', async () => {
   const sb = sandbox();
   const ocr: OcrFn = async () => { throw new Error('boom-ocr'); };

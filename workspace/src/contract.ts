@@ -5,6 +5,7 @@ export type GateVerdict = 'pass' | 'needs-review';
 
 export interface ValidatedReceipt extends ReceiptOcrResult {
   correlationId: string;
+  baseAmountSatang?: number | null; // pre-VAT base when OCR returns it
   vatCheckOk: boolean;
 }
 
