@@ -84,9 +84,7 @@ Architectural pattern where every adapter supports both DEV (mock) and PROD (rea
 ## E
 
 ### Express Accounting
-A Thai accounting software system that AutoAcct integrates with for exporting journal entries.
-
-**Status (2026-09-12):** on-premise desktop software, no proven public API — Exporter ships a human-reviewable file + interface until a real contract is found (see T8 spike).
+The Dhanakom desktop accounting program the firm actually uses (Thai, on-premise) — confirmed 2026-09-12. No proven public API; the `:9000` mock in AutoAcct's backend is a placeholder, not the real program.
 
 > Fix note: an earlier version of this entry listed REST endpoints (`POST /journal-entries`) — those were never verified. Do not cite them.
 
@@ -133,9 +131,9 @@ Modular code organization where components are small, focused, and composable (l
 ## M
 
 ### Mock Server
-A local server that mimics external API behavior for testing.
+A local server that mimics external API behavior for testing. AutoAcct (the operational backend, not this cookbook) ships mocks at `backend/src/dev/mock-servers/`; this cookbook keeps its DEV mocks inside each recipe's adapter.
 
-> Fix note: an earlier version claimed mocks live in `./mock-servers/` — that directory does not exist. DEV mocks currently live inside each recipe's adapter.
+> History: an earlier version of this entry pointed at `./mock-servers/` in this repo (wrong place); a later fix claimed mocks don't exist (wrong — they live in AutoAcct).
 
 ---
 

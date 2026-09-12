@@ -164,7 +164,7 @@ cat recipes/03-vision-ocr/groq-fallback/INTEGRATION.md
 - [Claude Vision Guide](https://docs.anthropic.com/claude/docs/vision)
 - [Groq API Docs](https://console.groq.com/docs)
 - [Anthropic Prompt Library](https://docs.anthropic.com/claude/page/prompts)
-- [AutoAcct Main Project](https://github.com/Waytid-way/AutoAcct) (coming soon)
+- [AutoAcct Main](https://github.com/Waytid-way/AutoAcct) - Operational backend (Next.js + Express + Medici ledger + review queue); this cookbook is its recipe/validation harness
 
 ---
 

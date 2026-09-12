@@ -58,6 +58,22 @@ Cookbook มี code พร้อมใช้แต่ไม่มีตัว�
 
 ---
 
+## 2026-09-12: Express = Dhanakom desktop, mock :9000 is placeholder
+
+**Status:** Accepted
+
+**Context:**
+"Express" meant three things at once: Dhanakom desktop (firm's real books), a fictional API mock on port 9000 in AutoAcct's backend, and Express.js itself.
+
+**Decision:**
+Target is Dhanakom desktop (confirmed by owner). The :9000 mock is a placeholder, not a contract. E5 must bridge AutoAcct → Dhanakom via whatever import the program really accepts (file-based most likely — #3 spike decides). Cookbook's role is recipe/validation harness + spare `IOcrAdapter` implementations for the AutoAcct backend, not a parallel pipeline.
+
+**Related:**
+- [Ticket #15 (E5)](https://github.com/Waytid-way/claude-autoacct-cookbook/issues/15)
+- [Ticket #3 (spike)](https://github.com/Waytid-way/claude-autoacct-cookbook/issues/3)
+
+---
+
 ## 2026-09-12: OpenRouter Free Vision for DEV (แทน OCR)
 
 **Status:** Accepted
