@@ -2,7 +2,7 @@
  * Type definitions for Groq OCR Fallback & Hybrid Strategy
  */
 
-import { OcrResult, OcrInput } from '../receipt-extraction/types';
+import type { ReceiptOcrResult, ExtractReceiptParams } from '../receipt-extraction/types';
 
 /**
  * Receipt classification result
@@ -72,6 +72,8 @@ export interface HybridStrategyConfig {
 }
 
 /**
- * Re-export from receipt-extraction
+ * Local aliases — single source of truth lives in receipt-extraction/types.
+ * ponytail: alias, not new types; merge into one contract in T2
  */
-export type { OcrResult, OcrInput };
+export type OcrResult = ReceiptOcrResult;
+export type OcrInput = ExtractReceiptParams;

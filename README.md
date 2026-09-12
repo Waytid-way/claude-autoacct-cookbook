@@ -137,6 +137,9 @@ cat recipes/03-vision-ocr/groq-fallback/INTEGRATION.md
 ### Core Documents
 
 - **[AutoAcct Context](./docs/autoacct-context.md)** - Business requirements, pain points, success criteria
+- **[OpenRouter Vision Free](./docs/openrouter-vision-free.md)** - 11 vision ฟรี + วิธีใช้แทน OCR (2026-09-12)
+- **[Pi as Harness](./docs/pi-harness.md)** - pi สั่งงาน AutoAcct ผ่าน cookbook นี้
+- **[Vision Benchmark](./docs/vision-benchmark.md)** - ผลเทียบรุ่นฟรีบนใบเสร็จไทย (2026-09-12)
 - **[Recipe Template](./templates/recipe-template.md)** - How to write a new recipe
 - **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute
 
