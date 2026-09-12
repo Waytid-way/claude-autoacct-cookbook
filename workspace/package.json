@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "run": "node src/runner.ts",
-    "check": "node selfcheck.ts"
+    "check": "node selfcheck.ts",
+    "test": "node --test test/runner.test.ts"
   }
 }
