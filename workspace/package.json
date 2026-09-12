@@ -1,0 +1,9 @@
+{
+  "name": "autoacct-workspace",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "run": "node src/runner.ts",
+    "check": "node selfcheck.ts"
+  }
+}

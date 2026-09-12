@@ -6,6 +6,9 @@
 
 ## A
 
+### Auto Gate
+Pure function deciding `pass` vs `needs-review` for a validated receipt (confidence threshold, VAT cross-check, critical fields present). Failures carry reasons; no I/O.
+
 ### Adapter Pattern
 A software design pattern that wraps external services (APIs, databases) behind a common interface, allowing implementations to be swapped without changing business logic.
 
@@ -81,9 +84,9 @@ Architectural pattern where every adapter supports both DEV (mock) and PROD (rea
 ### Express Accounting
 A Thai accounting software system that AutoAcct integrates with for exporting journal entries.
 
-**API Endpoints:**
-- POST `/journal-entries` - Create new entry
-- GET `/accounts` - List chart of accounts
+**Status (2026-09-12):** on-premise desktop software, no proven public API — Exporter ships a human-reviewable file + interface until a real contract is found (see T8 spike).
+
+> Fix note: an earlier version of this entry listed REST endpoints (`POST /journal-entries`) — those were never verified. Do not cite them.
 
 ### Exponential Backoff
 A retry strategy where wait time increases exponentially after each failure:
@@ -128,9 +131,16 @@ Modular code organization where components are small, focused, and composable (l
 ## M
 
 ### Mock Server
-A local server that mimics external API behavior for testing. AutoAcct includes mocks for Express API and Teable API.
+A local server that mimics external API behavior for testing.
 
-**Location:** `./mock-servers/`
+> Fix note: an earlier version claimed mocks live in `./mock-servers/` — that directory does not exist. DEV mocks currently live inside each recipe's adapter.
+
+---
+
+## N
+
+### Needs-review
+Folder (`workspace/needs-review/`) holding receipts the auto gate rejected, each with machine-readable reasons. A human approves or corrects; nothing flows to export from here automatically.
 
 ---
 
@@ -204,6 +214,9 @@ Claude: → Calls exportToExpress({...})
 ---
 
 ## V
+
+### Vertical Slice
+One receipt running end-to-end through every stage (Upload→OCR→Validate→Map→Export→Audit) with real OCR + real validation — mocks allowed only at the export edge.
 
 ### VAT (Value Added Tax / ภาษีมูลค่าเพิ่ม)
 Thai tax on goods and services. Standard rate is **7%**.

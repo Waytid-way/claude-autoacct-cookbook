@@ -33,6 +33,66 @@ Why did we make this decision? What alternatives did we consider?
 
 ---
 
+## 2026-09-12: Pi as Harness for AutoAcct
+
+**Status:** Accepted
+
+**Context:**
+Cookbook มี code พร้อมใช้แต่ไม่มีตัวกดรัน — ต้องการ harness ที่รับคำสั่งภาษาคนแล้วเรียก recipe จริง
+
+**Decision:**
+ใช้ **pi** (coding agent harness) สั่งงาน AutoAcct ผ่าน cookbook นี้: อ่าน `docs/` → เลือก recipe → รัน DEV (mock ฟรี) → ยืนยันกับคน → รัน PROD → export Express รายละเอียดใน [docs/pi-harness.md](./pi-harness.md)
+
+**Rationale:**
+- pi อยู่ใน Termux อยู่แล้ว เรียก `bun`/git ได้ตรง ไม่ต้องสร้าง runner ใหม่
+- กฎ DEV-ก่อน-PROD + correlationId + Satang บังคับที่ harness จุดเดียว
+
+**Consequences:**
+- ✅ Positive: สั่งด้วยภาษาไทยได้ ไม่ต้องจำคำสั่ง
+- ❌ Negative: pi ต้องอ่าน decision-log ก่อนทุกครั้ง ไม่งั้นกฎหลุด
+- ⚠️ Risk: สั่ง PROD พลาดเสียเงิน/ข้อมูลจริง — ต้องยืนยันกับคนก่อนเสมอ
+
+**Related:**
+- [docs/pi-harness.md](./pi-harness.md)
+- [docs/autoacct-context.md](./autoacct-context.md)
+
+---
+
+## 2026-09-12: OpenRouter Free Vision for DEV (แทน OCR)
+
+**Status:** Accepted
+
+**Context:**
+แทนที่จะใช้ OCR เดิม ต้องการใช้ AI model ที่มี Vision และราคาถูก เจอจาก `https://pi.dev/models` ว่ามีรุ่นฟรีบน OpenRouter 21 ตัว (Vision 11 + Text 10)
+
+**Decision:**
+- DEV/test ให้ใช้ OpenRouter `:free` Vision ก่อน โดยเริ่มที่ `google/gemma-4-26b-a4b-it:free` เทียบกับ `ling-3.0-flash-vl:free` และ `inkling:free`
+- PROD ใช้ตัวเสียเงินถูกเป็นหลัก (`gemini-2.5-flash-lite` $0.10/$0.40) + fallback ถูกสุด (`qwen3.7-flash` $0.03) ไม่ใช้ของฟรีตรงใน PROD
+- เก็บรายการทั้งหมดใน [docs/openrouter-vision-free.md](./openrouter-vision-free.md)
+
+**Rationale:**
+- ของฟรีเหมาะทดลอง/วัดคุณภาพภาษาไทยก่อนเสียเงิน
+- Gemini Flash-Lite แม่นไทยสุดในกลุ่มถูก (~฿0.005–0.008/ใบ) ถูกกว่า Claude 20–70x
+- Qwen3.7 Flash ถูกสุด (~฿0.002/ใบ) เหมาะเป็น fallback
+
+Alternatives considered:
+- ❌ ฟรีใน PROD → rate limit + รุ่นหายได้ + เสี่ยงข้อมูลลูกค้า
+- ❌ OCR เดิมอย่างเดียว → แม่นน้อยกว่า Vision model
+- ✅ ฟรี(DEV) + ถูก(PROD) → ทดลองฟรี ใช้จริงคุมต้นทุนได้
+
+**Consequences:**
+- ✅ Positive: ทดลองฟรี ไม่เสียเงินช่วงวัดคุณภาพ
+- ✅ Positive: PROD ต้นทุน/ใบต่ำลงมาก
+- ❌ Negative: ต้องมี retry + fallback เพราะโควต้าฟรีไม่แน่นอน
+- ⚠️ Risk: รุ่น `:free` เปลี่ยน/หายได้ — ต้องปัก model ใน config + log ทุกรอบ
+
+**Related:**
+- [docs/openrouter-vision-free.md](./openrouter-vision-free.md)
+- [Recipe: Receipt Extraction](../recipes/03-vision-ocr/receipt-extraction/)
+- [Recipe: Groq Fallback](../recipes/03-vision-ocr/groq-fallback/)
+
+---
+
 ## 2026-01-22: Dual Mode Architecture (DEV/PROD)
 
 **Status:** Accepted
