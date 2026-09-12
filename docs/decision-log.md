@@ -69,6 +69,7 @@ Cookbook มี code พร้อมใช้แต่ไม่มีตัว�
 Target is Dhanakom desktop (confirmed by owner). The :9000 mock is a placeholder, not a contract. E5 must bridge AutoAcct → Dhanakom via whatever import the program really accepts (file-based most likely — #3 spike decides). Cookbook's role is recipe/validation harness + spare `IOcrAdapter` implementations for the AutoAcct backend, not a parallel pipeline.
 
 **Related:**
+- [Ticket #23 (E9: cookbook as validator/adapter)](https://github.com/Waytid-way/claude-autoacct-cookbook/issues/23)
 - [Ticket #15 (E5)](https://github.com/Waytid-way/claude-autoacct-cookbook/issues/15)
 - [Ticket #3 (spike)](https://github.com/Waytid-way/claude-autoacct-cookbook/issues/3)
 
@@ -84,6 +85,7 @@ Target is Dhanakom desktop (confirmed by owner). The :9000 mock is a placeholder
 **Decision:**
 - DEV/test ให้ใช้ OpenRouter `:free` Vision ก่อน โดยเริ่มที่ `google/gemma-4-26b-a4b-it:free` เทียบกับ `ling-3.0-flash-vl:free` และ `inkling:free`
 - PROD ใช้ตัวเสียเงินถูกเป็นหลัก (`gemini-2.5-flash-lite` $0.10/$0.40) + fallback ถูกสุด (`qwen3.7-flash` $0.03) ไม่ใช้ของฟรีตรงใน PROD
+- ข้อยกเว้น privacy: ใบเสร็จ/ข้อมูลลูกค้าจริงห้ามผ่าน `:free` ทุกกรณี (ดู K1 #19) — ข้อนี้เหนือความประหยัด
 - เก็บรายการทั้งหมดใน [docs/openrouter-vision-free.md](./openrouter-vision-free.md)
 
 **Rationale:**

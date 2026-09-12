@@ -11,7 +11,7 @@
 
 ## 🎯 What is This?
 
-**AutoAcct** = Automated accounting system for Thai accountants (OCR → Double-entry → Export to Express Accounting)
+**AutoAcct** = Automated accounting system for Thai accountants (OCR → Double-entry → Export to Dhanakom Express Accounting, desktop)
 
 **This Cookbook** = Ready-to-use code recipes showing how to use Claude AI for:
 - 📸 Receipt OCR (Thai text extraction)
@@ -21,7 +21,7 @@
 - 🔄 Data transformation
 - ✅ Quality validation
 
-**`workspace/`** = Running pipeline slice (not a recipe): one receipt in, journal file out, bad receipts to `needs-review/` with reasons.
+**`workspace/`** = Running validation slice (not a recipe, not the production path): one receipt in, journal file out, bad receipts to `needs-review/` with reasons.
 
 ---
 
@@ -65,7 +65,7 @@
 
 #### 04. Tool Use
 - [ ] Multi-step Workflows
-- [ ] Express Export Integration
+- [ ] Dhanakom Export Integration (blocked: #3 spike — the program has no proven API)
 - [ ] Account Code Mapping
 
 #### 05. Reliability
@@ -215,7 +215,7 @@ Don't just use the most expensive API for everything:
 All recipes are optimized for:
 - 🇹🇭 Thai language (receipts, invoices)
 - 💰 Thai accounting rules (VAT 7%, Chart of Accounts)
-- 🏢 Thai accounting firms (Express Accounting integration)
+- 🏢 Thai accounting firms (Dhanakom Express Accounting — desktop, file-bridge TBD in #3)
 
 ---
 
@@ -326,7 +326,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 - [ ] Account Code Classifier
 - [ ] Expense Category Predictor
 - [ ] Multi-receipt Batch Processor
-- [ ] Express API Export Module
+- [ ] Dhanakom Export Module (file bridge, not API)
 - [ ] VAT Validator
 - [ ] Retry Logic with Exponential Backoff
 
@@ -354,11 +354,11 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 - [x] Receipt OCR with Claude Vision
 - [x] Groq Fallback & Hybrid Strategy
 - [x] Workspace slice (OCR→gate→outbox, DEV+PROD) — validation gate + sequential batch loop included
-- [ ] Express Export Module (blocked: #3 spike, see epic #11)
+- [ ] Dhanakom Export Module (blocked: #3 spike, see epic #11)
 - [ ] Benchmark 20–50 ใบจริง (#14) + KB ลูกค้า A (#19→#21)
 
 ### Phase 2: Integration Recipes
-- [ ] Express Export Module
+- [ ] Dhanakom Export Module
 - [ ] Retry Logic with Backoff
 - [ ] Account Code Mapping
 - [ ] PaddleOCR Integration
