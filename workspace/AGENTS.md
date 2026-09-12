@@ -22,4 +22,4 @@ Done = outbox artifact exists with balanced journal + audit lines per receipt + 
 - Gate threshold: `GATE_MIN_CONF` env (default 0.85) or `minConf` param — prefer the param; never mutate env to pass values.
 - Tests never touch network: inject mock `ocr()`. The only real-OCR path is `pi` CLI (skill `.pi/skills/receipt-ocr-node/`); run it by hand, not in tests.
 - Real client files: paid/local path only, never `:free`; needs consent. See decision-log 2026-09-12.
-- No `any`, no `!` in new code; tsc recipe is in `package.json` scripts — follow it, don't restate flags here.
+- Type new code explicitly (`| null` + narrow after the gate) and verify with `npm run typecheck` (repo-local script, not global tsc).
