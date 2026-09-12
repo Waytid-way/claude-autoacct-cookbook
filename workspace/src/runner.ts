@@ -9,7 +9,7 @@ import { gate } from './gate.ts';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const INBOX = join(ROOT, 'inbox'), OUTBOX = join(ROOT, 'outbox'), REVIEW = join(ROOT, 'needs-review');
 const APP_MODE = process.env.APP_MODE ?? 'DEV';
-const OCR_MODEL = process.env.OCR_MODEL ?? 'thinkingmachines/inkling:free'; // benchmarked 6/6
+const OCR_MODEL = process.env.OCR_MODEL ?? 'google/gemini-2.5-flash-lite'; // PROD ใช้ตัวเสียเงิน (decision-log); :free แค่ DEV
 const EXPENSE_ACCT = process.env.EXPENSE_ACCT ?? '5000-MEALS';
 const CASH_ACCT = process.env.CASH_ACCT ?? '1000-CASH';
 
@@ -30,7 +30,8 @@ async function ocr(imagePath: string, correlationId: string): Promise<{ result: 
     'Extract amountSatang, vatAmountSatang, baseAmountSatang, vendorName, issueDate (YYYY-MM-DD), confidence (0-1) as JSON only. Satang integers. null when unreadable. Never fabricate.'],
     { encoding: 'utf8', timeout: 180000 });
   const m = out.match(/```json\s*([\s\S]*?)```/) ?? out.match(/(\{[\s\S]*\})/);
-  const j = JSON.parse(m![1]);
+  if (!m) throw new Error(`OCR returned no JSON (model ${OCR_MODEL}, ${out.slice(0, 120)})`);
+  const j = JSON.parse(m[1]);
   return { model: OCR_MODEL, result: {
     amountSatang: j.amountSatang, currency: 'THB', vatAmountSatang: j.vatAmountSatang,
     vendorName: j.vendorName, issueDate: j.issueDate, confidence: j.confidence, rawText: j.notes,
@@ -68,6 +69,7 @@ for (const f of readdirSync(INBOX).filter(f => /\.(jpe?g|png|webp)$/i.test(f))) 
     }
     const journal = mapToJournal(v);
     const artifact: ExportArtifact = { correlationId, vendorName: v.vendorName, issueDate: v.issueDate,
+      totalSatang: v.amountSatang!, vatSatang: v.vatAmountSatang!,
       totalBaht: v.amountSatang! / 100, vatBaht: v.vatAmountSatang! / 100, journal, ocrModel: model };
     writeFileSync(join(OUTBOX, `${correlationId}.json`), JSON.stringify(artifact, null, 2));
     log({ stage: 'export', verdict: 'pass', outbox: `${correlationId}.json` });

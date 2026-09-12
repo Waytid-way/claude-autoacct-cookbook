@@ -29,8 +29,10 @@ export interface ExportArtifact {
   correlationId: string;
   vendorName: string | null;
   issueDate: string | null;
-  totalBaht: number;
-  vatBaht: number | null;
+  totalSatang: number; // authoritative — Baht below is display-only
+  vatSatang: number | null; // authoritative
+  totalBaht: number; // display-only, derived
+  vatBaht: number | null; // display-only, derived
   journal: JournalEntry;
   ocrModel: string;
 }
