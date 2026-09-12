@@ -8,7 +8,7 @@ import { gate } from './gate.ts';
 export type OcrFn = (
   imagePath: string,
   correlationId: string,
-) => Promise<{ result: ReceiptOcrResult; model: string }>;
+) => Promise<{ result: ReceiptOcrResult; model: string; baseAmountSatang?: number | null }>;
 
 export interface RunPipelineOptions {
   inboxDir: string;
@@ -30,15 +30,16 @@ const CASH_ACCT = process.env.CASH_ACCT ?? '1000-CASH';
 
 const cid = (): string => `autoacct-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-function validate(r: ReceiptOcrResult, correlationId: string): ValidatedReceipt {
-  // ponytail: totals-only check (total > vat >= 0); full base+vat reconciliation when OCR returns line items
-  const vatCheckOk =
-    r.amountSatang != null &&
-    r.amountSatang > 0 &&
-    r.vatAmountSatang != null &&
-    r.vatAmountSatang >= 0 &&
-    r.amountSatang > r.vatAmountSatang;
-  return { ...r, correlationId, vatCheckOk };
+function validate(r: ReceiptOcrResult, correlationId: string, base?: number | null): ValidatedReceipt {
+  // exact triple when OCR returns base (total === base + vat); else totals-only fallback
+  const exact = r.amountSatang != null && r.vatAmountSatang != null && base != null
+    ? r.amountSatang === base + r.vatAmountSatang
+    : null;
+  const vatCheckOk = exact ?? (
+    r.amountSatang != null && r.amountSatang > 0 &&
+    r.vatAmountSatang != null && r.vatAmountSatang >= 0 && r.amountSatang > r.vatAmountSatang
+  );
+  return { ...r, correlationId, baseAmountSatang: base ?? null, vatCheckOk };
 }
 
 function mapToJournal(v: ValidatedReceipt, totalSatang: number, txDate: string): JournalEntry {
@@ -69,8 +70,8 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
         appendFileSync(opts.auditFile, JSON.stringify({ correlationId, ...o }) + '\n');
       };
       try {
-        const { result, model } = await opts.ocr(join(opts.inboxDir, f), correlationId);
-        const v = validate(result, correlationId);
+        const { result, model, baseAmountSatang } = await opts.ocr(join(opts.inboxDir, f), correlationId);
+        const v = validate(result, correlationId, baseAmountSatang);
         const d = gate(v, opts.minConf);
         log({ stage: 'ocr', model, amountSatang: v.amountSatang, confidence: v.confidence });
         if (d.verdict === 'needs-review') {

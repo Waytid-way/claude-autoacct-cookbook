@@ -12,6 +12,7 @@ const OCR_MODEL = process.env.OCR_MODEL ?? 'google/gemini-2.5-flash-lite'; // PR
 interface OcrJson {
   amountSatang: number;
   vatAmountSatang: number | null;
+  baseAmountSatang?: number | null;
   vendorName: string | null;
   issueDate: string | null;
   confidence?: number;
@@ -22,10 +23,11 @@ interface OcrJson {
 async function defaultOcr(
   imagePath: string,
   _correlationId: string,
-): Promise<{ result: ReceiptOcrResult; model: string }> {
+): Promise<{ result: ReceiptOcrResult; model: string; baseAmountSatang?: number | null }> {
   if (APP_MODE === 'DEV') {
     return {
       model: 'mock',
+      baseAmountSatang: 32710,
       result: {
         amountSatang: 35000,
         currency: 'THB',
@@ -51,6 +53,7 @@ async function defaultOcr(
   const j: OcrJson = JSON.parse(m[1]);
   return {
     model: OCR_MODEL,
+    baseAmountSatang: j.baseAmountSatang ?? null,
     result: {
       amountSatang: j.amountSatang,
       currency: 'THB',

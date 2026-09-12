@@ -19,8 +19,8 @@ pi -p --no-session --model "openrouter/<model-id>" --thinking low --no-tools @"<
 
 You should see: a 7-key JSON block (6 fields + notes) with Satang ints + a count line.
 
-Proven models (2026-09-12, `docs/vision-benchmark.md`): `thinkingmachines/inkling:free` 6/6, `muse-spark-1.3-contributor-free` 6/6, `google/gemini-2.5-flash-lite` (paid PROD default). Gemma `:free` 429s on shared pool — retry later, don't hammer.
+Proven defaults live in code (`workspace/src/runner.ts`: `OCR_MODEL`) and results in `docs/vision-benchmark.md` — don't copy model lists here. Free tiers 429 under load: wait or BYOK, never hammer.
 
 ## Rules
 
-Amounts stay Satang ints; `null` beats a guess; real client images take the paid/local path with consent, never `:free`.
+Output contract above is authoritative for this skill. Amounts, PII, and paid-vs-free rules: same as `workspace/AGENTS.md` — follow that file, nothing here overrides it.
