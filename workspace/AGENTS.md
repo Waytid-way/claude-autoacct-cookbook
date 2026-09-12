@@ -8,8 +8,9 @@ Pipeline slice: one receipt `inbox/` → `outbox/` or `needs-review/`, traced in
 cp sample/receipt-001.jpg inbox/   # seed one receipt
 APP_MODE=DEV node src/runner.ts    # mock, free, deterministic
 APP_MODE=PROD node src/runner.ts   # real OCR (needs key for paid default)
-npm test                           # black-box suite (must stay 4/4)
+npm test                           # black-box suite (must stay 6/6)
 node selfcheck.ts                  # gate checks (must stay 4/4)
+npm run typecheck                  # tsc (must stay green)
 ```
 
 Done = outbox artifact exists with balanced journal + audit lines per receipt + all three checks green.
@@ -20,6 +21,8 @@ Done = outbox artifact exists with balanced journal + audit lines per receipt + 
 - PROD default model is paid (`OCR_MODEL`, see `src/runner.ts`); override per run, never commit keys. `:free` models are DEV-only.
 - Money is Satang ints end to end; `totalBaht` in artifacts is display-only.
 - Gate threshold comes from `minConf` param (env `GATE_MIN_CONF` is the fallback; default lives in `src/gate.ts`) — prefer the param; never mutate env to pass values.
+- Validate prefers exact triple (`total === base + vat`) when OCR returns `baseAmountSatang`; totals-only check is the fallback, not the rule.
 - Tests never touch network: inject mock `ocr()`. The only real-OCR path is `pi` CLI (skill `.pi/skills/receipt-ocr-node/`); run it by hand, not in tests.
 - Real client files: paid/local path only, never `:free`; needs consent. See decision-log 2026-09-12.
 - Type new code explicitly (`| null` + narrow after the gate) and verify with `npm run typecheck` (repo-local script, not global tsc).
+- Ship in small PRs (one ticket = one PR); review feedback goes to the same PR, never a new one.
