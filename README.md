@@ -1,11 +1,11 @@
 # 🍳 Claude AutoAcct Cookbook
 
 > **Practical recipes for integrating Claude AI with AutoAcct** - รวบรวม code พร้อมใช้งานจริงสำหรับ Auto Accounting Project
+>
+> **2026-09: `workspace/` รันได้จริงแล้ว** — pipeline ใบเดียวจบ (inbox → OCR → gate → outbox/needs-review) ด้วย pi เป็น harness ดู `AGENTS.md`
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
-[![Bun](https://img.shields.io/badge/Bun-1.0-orange)](https://bun.sh)
-[![Claude](https://img.shields.io/badge/Claude-3.5_Sonnet-purple)](https://anthropic.com)
-[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Node](https://img.shields.io/badge/Node-26-green)](https://nodejs.org/)
 
 ---
 
@@ -20,6 +20,8 @@
 - ⚖️ Account code mapping
 - 🔄 Data transformation
 - ✅ Quality validation
+
+**`workspace/`** = Running pipeline slice (not a recipe): one receipt in, journal file out, bad receipts to `needs-review/` with reasons.
 
 ---
 
@@ -87,6 +89,17 @@
 - (Optional) Groq API key from [console.groq.com](https://console.groq.com)
 - (Optional) AutoAcct backend project
 
+### Run the Pipeline Slice
+
+```bash
+cd workspace && cp sample/receipt-001.jpg inbox/
+APP_MODE=DEV node src/runner.ts   # mock, free
+APP_MODE=PROD node src/runner.ts  # real OCR (paid default, needs key)
+npm test                           # 6/6 green
+```
+
+Outbox = ready files · `needs-review/` = rejected with reasons · `audit.log.jsonl` = trace. Details: [`workspace/AGENTS.md`](./workspace/AGENTS.md).
+
 ### Try a Recipe (Standalone)
 
 ```bash
@@ -136,11 +149,13 @@ cat recipes/03-vision-ocr/groq-fallback/INTEGRATION.md
 
 ### Core Documents
 
+- **[CONTEXT](./CONTEXT.md)** - Ubiquitous language (wins on conflicts)
+- **[Decision Log](./docs/decision-log.md)** - Architectural decisions
+- **[Blueprints](./docs/blueprints/)** - Long-term direction (conceptual + Phase 0 knowledge architecture, not MVP scope)
 - **[AutoAcct Context](./docs/autoacct-context.md)** - Business requirements, pain points, success criteria
 - **[OpenRouter Vision Free](./docs/openrouter-vision-free.md)** - 11 vision ฟรี + วิธีใช้แทน OCR (2026-09-12)
 - **[Pi as Harness](./docs/pi-harness.md)** - pi สั่งงาน AutoAcct ผ่าน cookbook นี้
 - **[Vision Benchmark](./docs/vision-benchmark.md)** - ผลเทียบรุ่นฟรีบนใบเสร็จไทย (2026-09-12)
-- **[Recipe Template](./templates/recipe-template.md)** - How to write a new recipe
 - **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute
 
 ### External References
@@ -299,10 +314,9 @@ We welcome contributions!
 ### Adding a Recipe
 
 1. Fork this repo
-2. Copy `templates/recipe-template/`
-3. Implement your recipe
-4. Write tests
-5. Submit PR
+2. Implement your recipe
+3. Write tests
+4. Submit PR
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
@@ -325,21 +339,23 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 | Getting Started | 0/3 | 🔴 Not started |
 | Foundations | 0/4 | 🔴 Not started |
 | **Vision & OCR** | **2/4** | 🟡 **In progress** |
+| **Workspace slice** | **done** | 🟢 **Runs (DEV+PROD)** |
 | Tool Use | 0/3 | 🔴 Not started |
 | Reliability | 0/3 | 🔴 Not started |
 | Testing | 0/3 | 🔴 Not started |
 
-**Total:** 2/20 recipes complete (10%)
+**Total:** 2/20 recipes complete (10%) + workspace slice runs end to end
 
 ---
 
 ## 📝 Roadmap
 
-### Phase 1: Core Recipes (กำลังทำ) 🟢
+### Phase 1: Core Recipes 🟢
 - [x] Receipt OCR with Claude Vision
 - [x] Groq Fallback & Hybrid Strategy
-- [ ] Quality Validation
-- [ ] Batch Processing
+- [x] Workspace slice (OCR→gate→outbox, DEV+PROD) — validation gate + sequential batch loop included
+- [ ] Express Export Module (blocked: #3 spike, see epic #11)
+- [ ] Benchmark 20–50 ใบจริง (#14) + KB ลูกค้า A (#19→#21)
 
 ### Phase 2: Integration Recipes
 - [ ] Express Export Module
@@ -397,7 +413,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ## 📜 License
 
-MIT License - see [LICENSE](./LICENSE) for details.
+MIT (no LICENSE file in repo yet — see issue tracker if you need one).
 
 ---
 
