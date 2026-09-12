@@ -1,6 +1,8 @@
 # Glossary
 
 > Domain-specific terminology used in AutoAcct and this cookbook.
+>
+> Canonical domain language lives in [`CONTEXT.md`](../CONTEXT.md) — it wins on conflicts. This file keeps implementation-adjacent reference.
 
 ---
 
