@@ -19,7 +19,10 @@ interface OcrJson {
   notes?: string;
 }
 
-// DEV: canned mock (free, deterministic). PROD: real OCR via pi CLI vision model.
+const OCR_FALLBACK = (process.env.OCR_FALLBACK ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+
+// DEV: canned mock (free, deterministic). PROD: real OCR via pi CLI, primary → fallbacks in order.
+// ponytail: dumb for-loop; retry/backoff libraries when flakiness data says so
 async function defaultOcr(
   imagePath: string,
   _correlationId: string,
@@ -39,20 +42,35 @@ async function defaultOcr(
       },
     };
   }
+  let lastError: unknown = null;
+  for (const model of [OCR_MODEL, ...OCR_FALLBACK]) {
+    try {
+      return await runOcr(model, imagePath);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
+
+async function runOcr(
+  model: string,
+  imagePath: string,
+): Promise<{ result: ReceiptOcrResult; model: string; baseAmountSatang?: number | null }> {
   const out = execFileSync(
     'pi',
     [
-      '-p', '--no-session', '--model', `openrouter/${OCR_MODEL}`,
+      '-p', '--no-session', '--model', `openrouter/${model}`,
       '--thinking', 'low', '--no-tools', `@${imagePath}`,
       'Extract amountSatang, vatAmountSatang, baseAmountSatang, vendorName, issueDate (YYYY-MM-DD), confidence (0-1) as JSON only. Satang integers. null when unreadable. Never fabricate.',
     ],
     { encoding: 'utf8', timeout: 180000 },
   );
   const m = out.match(/```json\s*([\s\S]*?)```/) ?? out.match(/(\{[\s\S]*\})/);
-  if (!m) throw new Error(`OCR returned no JSON (model ${OCR_MODEL}, ${out.slice(0, 120)})`);
+  if (!m) throw new Error(`OCR returned no JSON (model ${model}, ${out.slice(0, 120)})`);
   const j: OcrJson = JSON.parse(m[1]);
   return {
-    model: OCR_MODEL,
+    model,
     baseAmountSatang: j.baseAmountSatang ?? null,
     result: {
       amountSatang: j.amountSatang,

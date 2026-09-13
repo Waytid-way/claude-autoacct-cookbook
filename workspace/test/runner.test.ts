@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { runPipeline } from '../src/pipeline.ts';
+import { normalizeThaiDate } from '../src/pipeline.ts';
 import type { OcrFn } from '../src/pipeline.ts';
 import type { ExportArtifact } from '../src/contract.ts';
 
@@ -70,7 +71,7 @@ test('ใบผ่าน gate → outbox artifact ครบ + audit ocr/export +
     },
   });
   const summary = await runPipeline({ ...sb, ocr });
-  assert.deepEqual(summary, { passed: 1, needsReview: 0, errors: 0 });
+  assert.deepEqual(summary, { passed: 1, needsReview: 0, errors: 0, skipped: 0 });
   const outFiles = readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json'));
   assert.equal(outFiles.length, 1);
   const artifact = JSON.parse(readFileSync(join(sb.outboxDir, outFiles[0]), 'utf8')) as ExportArtifact;
@@ -162,4 +163,39 @@ test('ocr พัง → ลง audit stage error ไม่ crash', async () => {
   const audit = readFileSync(sb.auditFile, 'utf8');
   assert.ok(audit.includes('"stage":"error"'));
   assert.ok(audit.includes('boom-ocr'));
+});
+
+// (6) วันที่ไทย: พ.ศ. และ DD/MM/ค.ศ. → ISO; ขยะ → needs-review
+test('วันที่ไทย พ.ศ./ค.ศ. normalize ถูก, ขยะตก gate', async () => {
+  assert.equal(normalizeThaiDate('12/09/2569'), '2026-09-12');
+  assert.equal(normalizeThaiDate('12/09/2026'), '2026-09-12');
+  assert.equal(normalizeThaiDate('2026-09-12'), '2026-09-12');
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    result: {
+      amountSatang: 35000, currency: 'THB', vatAmountSatang: 2290,
+      vendorName: 'x', issueDate: 'เมื่อวาน', confidence: 0.99, rawText: 't',
+    },
+  });
+  const summary = await runPipeline({ ...sb, ocr });
+  assert.equal(summary.needsReview, 1);
+});
+
+// (7) รันซ้ำไฟล์เดิม → dedup-skip ไม่ประมวลผลซ้ำ
+test('รันซ้ำ → skipped:1 ไม่มี outbox ใหม่', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    result: {
+      amountSatang: 41250, currency: 'THB', vatAmountSatang: 2700,
+      vendorName: 'KHAO-TEST-VENDOR', issueDate: '2026-09-11', confidence: 0.99, rawText: 't',
+    },
+  });
+  const first = await runPipeline({ ...sb, ocr });
+  assert.equal(first.passed, 1);
+  const second = await runPipeline({ ...sb, ocr });
+  assert.deepEqual(second, { passed: 0, needsReview: 0, errors: 0, skipped: 1 });
+  const audit = readFileSync(sb.auditFile, 'utf8');
+  assert.ok(audit.includes('"stage":"dedup-skip"'));
 });

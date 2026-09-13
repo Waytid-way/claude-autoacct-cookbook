@@ -40,6 +40,14 @@ _Avoid_: Error log, failed OCR
 Two trusted-looking claims that disagree (e.g. same vendor+type mapping to two accounts). Surfaced with both support counts, never silently picked.
 _Avoid_: data error
 
+**Dual-run**:
+Running the legacy backend and the new slice side by side on the same receipts and comparing (account, amount, tax) triples. During pilot the legacy posting stands; mismatches go to investigation, never auto-overwrite.
+_Avoid_: A/B test, shadow mode
+
+**Dhanakom Bridge**:
+The file handoff carrying validated journal data from AutoAcct into Dhanakom desktop (CSV/Excel per #3 direction). The Exporter produces the file; the Bridge is the agreed format plus the import procedure.
+_Avoid_: API integration, sync
+
 **Evidence**:
 Per-decision package (confidence, rule applied, model version, timestamp) proving why something passed. Thicker than an audit trace.
 _Avoid_: Audit log (that's the trace, not the proof)
