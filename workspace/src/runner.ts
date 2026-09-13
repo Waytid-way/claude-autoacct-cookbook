@@ -42,15 +42,21 @@ async function defaultOcr(
       },
     };
   }
-  let lastError: unknown = null;
-  for (const model of [OCR_MODEL, ...OCR_FALLBACK]) {
+  const chain = [OCR_MODEL, ...OCR_FALLBACK].filter((m, i, a) => a.indexOf(m) === i);
+  if (APP_MODE === 'PROD') {
+    const blocked = chain.filter((m) => m.endsWith(':free'));
+    if (blocked.length) console.warn(`PROD: refusing :free models (${blocked.join(',')}) — :free is DEV-only`);
+  }
+  const attempts: unknown[] = [];
+  for (const model of APP_MODE === 'PROD' ? chain.filter((m) => !m.endsWith(':free')) : chain) {
     try {
       return await runOcr(model, imagePath);
     } catch (e) {
-      lastError = e;
+      console.warn(`OCR attempt failed (${model}): ${e instanceof Error ? e.message : e}`.slice(0, 160));
+      attempts.push(e);
     }
   }
-  throw lastError;
+  throw new AggregateError(attempts, `OCR failed on all models (${chain.join(',')})`);
 }
 
 async function runOcr(

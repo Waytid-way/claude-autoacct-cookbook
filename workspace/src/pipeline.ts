@@ -33,15 +33,22 @@ const CASH_ACCT = process.env.CASH_ACCT ?? '1000-CASH';
 const cid = (): string => `autoacct-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 // Thai dates: DD/MM/YYYY with Buddhist year (>2400 → -543) or Gregorian; ISO passes through.
-// ponytail: regex + Date check only; full calendar libs when lunar/edge formats appear
+// ponytail: regex + Date check only; full calendar libs when lunar/edge formats appear.
+// Thai receipts are DD/MM — MM/DD sources would mis-parse silently; revisit if non-Thai sources appear.
 export function normalizeThaiDate(s: string | null): string | null {
   if (!s) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  const t = s.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return roundTrip(t);
+  const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return null;
   const y = Number(m[3]) > 2400 ? Number(m[3]) - 543 : Number(m[3]);
-  const iso = `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  return Number.isNaN(Date.parse(iso)) ? null : iso;
+  return roundTrip(`${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`);
+}
+
+// round-trip: reject overflow (2026-99-99, 2026-02-30) that Date.parse alone may forgive
+function roundTrip(iso: string): string | null {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? null : iso;
 }
 
 function validate(r: ReceiptOcrResult, correlationId: string, base?: number | null): ValidatedReceipt {
@@ -54,6 +61,25 @@ function validate(r: ReceiptOcrResult, correlationId: string, base?: number | nu
     r.vatAmountSatang != null && r.vatAmountSatang >= 0 && r.amountSatang > r.vatAmountSatang
   );
   return { ...r, correlationId, issueDate: normalizeThaiDate(r.issueDate), baseAmountSatang: base ?? null, vatCheckOk };
+}
+
+// hash store: JSON.parse per line, not regex — survives pretty-print/field reorder; corrupt lines skipped
+function loadSeenHashes(auditFile: string): Set<string> {
+  const seen = new Set<string>();
+  let raw: string;
+  try {
+    raw = readFileSync(auditFile, 'utf8');
+  } catch {
+    return seen; // first run: no audit file yet
+  }
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const h = (JSON.parse(line) as { sha256?: unknown }).sha256;
+      if (typeof h === 'string' && /^[0-9a-f]{64}$/.test(h)) seen.add(h);
+    } catch { /* corrupt line: skip, never crash dedup */ }
+  }
+  return seen;
 }
 
 function mapToJournal(v: ValidatedReceipt, totalSatang: number, txDate: string): JournalEntry {
@@ -77,13 +103,7 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
     if (!existsSync(d)) mkdirSync(d, { recursive: true });
   }
   const summary: PipelineSummary = { passed: 0, needsReview: 0, errors: 0, skipped: 0 };
-  const seen = new Set<string>();
-  try {
-    for (const line of readFileSync(opts.auditFile, 'utf8').split('\n')) {
-      const h = line.match(/"sha256":"([0-9a-f]{64})"/)?.[1];
-      if (h) seen.add(h);
-    }
-  } catch { /* first run: no audit file yet */ }
+  const seen = loadSeenHashes(opts.auditFile);
     const files = readdirSync(opts.inboxDir).filter((f) => /\.(jpe?g|png|webp)$/i.test(f));
     for (const f of files) {
       const correlationId = cid();

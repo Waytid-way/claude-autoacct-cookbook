@@ -170,6 +170,10 @@ test('วันที่ไทย พ.ศ./ค.ศ. normalize ถูก, ขย�
   assert.equal(normalizeThaiDate('12/09/2569'), '2026-09-12');
   assert.equal(normalizeThaiDate('12/09/2026'), '2026-09-12');
   assert.equal(normalizeThaiDate('2026-09-12'), '2026-09-12');
+  assert.equal(normalizeThaiDate(' 12/09/2569 '), '2026-09-12');
+  assert.equal(normalizeThaiDate('2026-99-99'), null);
+  assert.equal(normalizeThaiDate('2026-02-30'), null);
+  assert.equal(normalizeThaiDate('12/09/2569xyz'), null);
   const sb = sandbox();
   const ocr: OcrFn = async () => ({
     model: 'mock',
