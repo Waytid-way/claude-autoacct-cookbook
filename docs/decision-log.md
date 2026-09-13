@@ -58,6 +58,21 @@ Cookbook มี code พร้อมใช้แต่ไม่มีตัว�
 
 ---
 
+## 2026-09-13: pr-review skill + CDE batch semantics
+
+**Status:** Accepted
+
+**Context:**
+Eval of the new `pr-review` skill (with-skill vs baseline, 3 cases) surfaced real defects: dedup remembered needs-review/error files, fallback chain untested, Buddhist-year ISO slipped through.
+
+**Decision:**
+Remember hashes on pass only; extract testable `buildChain()`; normalize Buddhist-year ISO. Suite now 9/9. Skill reviewers must also run file-level checks (newline/refs/secrets) — baseline beat the team there.
+
+**Related:**
+- `.pi/skills/pr-review/`
+
+---
+
 ## 2026-09-13: Harden slice from scout lessons + CDE stress
 
 **Status:** Accepted

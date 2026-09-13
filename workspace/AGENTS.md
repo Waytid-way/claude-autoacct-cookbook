@@ -24,7 +24,7 @@ Done = outbox artifact exists with balanced journal + audit lines per receipt + 
 - Validate prefers exact triple (`total === base + vat`) when OCR returns `baseAmountSatang`; totals-only check is the fallback, not the rule.
 - Thai dates normalize (`DD/MM/YYYY`, Buddhist year −543) or the receipt fails the gate; unparseable dates are data, not crashes.
 - OCR fallback chain (`OCR_MODEL` + `OCR_FALLBACK`) tries in order; PROD warns and skips `:free` entries, continuing the chain.
-- Reruns skip already-processed files (sha256 in audit log → `dedup-skip`, counted in `summary.skipped`).
+- Reruns skip passed files only (sha256 in audit log → `dedup-skip`, counted in `summary.skipped`); review/error files stay rerunnable.
 - Tests never touch network: inject mock `ocr()`. The only real-OCR path is `pi` CLI (skill `.pi/skills/receipt-ocr-node/`); run it by hand, not in tests.
 - Real client files: paid/local path only, never `:free`; needs consent. See decision-log 2026-09-12.
 - Type new code explicitly (`| null` + narrow after the gate) and verify with `npm run typecheck` (repo-local script, not global tsc).
