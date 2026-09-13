@@ -39,7 +39,7 @@ export function normalizeThaiDate(s: string | null): string | null {
   if (!s) return null;
   const t = s.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return roundTrip(t);
-  const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
   if (!m) return null;
   const y = Number(m[3]) > 2400 ? Number(m[3]) - 543 : Number(m[3]);
   return roundTrip(`${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`);

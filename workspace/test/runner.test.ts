@@ -168,6 +168,8 @@ test('ocr พัง → ลง audit stage error ไม่ crash', async () => {
 // (6) วันที่ไทย: พ.ศ. และ DD/MM/ค.ศ. → ISO; ขยะ → needs-review
 test('วันที่ไทย พ.ศ./ค.ศ. normalize ถูก, ขยะตก gate', async () => {
   assert.equal(normalizeThaiDate('12/09/2569'), '2026-09-12');
+  assert.equal(normalizeThaiDate('12-09-2569'), '2026-09-12');
+  assert.equal(normalizeThaiDate('12.09.2569'), '2026-09-12');
   assert.equal(normalizeThaiDate('12/09/2026'), '2026-09-12');
   assert.equal(normalizeThaiDate('2026-09-12'), '2026-09-12');
   assert.equal(normalizeThaiDate(' 12/09/2569 '), '2026-09-12');
