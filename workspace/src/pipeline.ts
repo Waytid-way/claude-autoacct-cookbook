@@ -120,6 +120,13 @@ export function buildChain(
   };
 }
 
+function writeReviewFile(reviewDir: string, correlationId: string, file: string, reasons: string[], v: ValidatedReceipt, model: string): void {
+  writeFileSync(
+    join(reviewDir, `${correlationId}.json`),
+    JSON.stringify({ file, reasons, ocr: v, model }, null, 2),
+  );
+}
+
 // Public seam: รันทั้ง pipeline (ocr → validate → gate → outbox/needs-review) พร้อม audit log
 export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSummary> {
   for (const d of [opts.inboxDir, opts.outboxDir, opts.reviewDir]) {
@@ -145,10 +152,7 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
         const d = gate(v, opts.minConf);
         log({ stage: 'ocr', model, sha256, amountSatang: v.amountSatang, confidence: v.confidence });
         if (d.verdict === 'needs-review') {
-          writeFileSync(
-            join(opts.reviewDir, `${correlationId}.json`),
-            JSON.stringify({ file: f, reasons: d.reasons, ocr: v, model }, null, 2),
-          );
+          writeReviewFile(opts.reviewDir, correlationId, f, d.reasons, v, model);
           log({ stage: 'gate', verdict: 'needs-review', reasons: d.reasons });
           console.log(`${f} -> needs-review (${d.reasons.join('; ')})`);
           summary.needsReview++;
@@ -157,17 +161,7 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
         const total = v.amountSatang;
         const vat = v.vatAmountSatang;
         const date = v.issueDate;
-        if (total == null || vat == null || date == null) {
-          const reasons = ['missing total/vat/date after gate pass'];
-          writeFileSync(
-            join(opts.reviewDir, `${correlationId}.json`),
-            JSON.stringify({ file: f, reasons, ocr: v, model }, null, 2),
-          );
-          log({ stage: 'gate', verdict: 'needs-review', reasons });
-          console.log(`${f} -> needs-review (${reasons.join('; ')})`);
-          summary.needsReview++;
-          continue;
-        }
+        if (total == null || vat == null || date == null) throw new Error('unreachable: gate passed with missing total/vat/date');
         const journal = mapToJournal(v, total, date);
         writeFileSync(
           join(opts.outboxDir, `${correlationId}.json`),
