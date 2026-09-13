@@ -212,3 +212,29 @@ test('buildChain เรียง ลบซ้ำ กรอง :free เฉพา
   assert.deepEqual(buildChain('a', ['x:free', 'b'], true), { models: ['a', 'b'], refused: ['x:free'] });
   assert.deepEqual(buildChain('x:free', [], true), { models: [], refused: ['x:free'] });
 });
+
+// (9) needs-review รันซ้ำต้องไม่ skip (pass-only dedup)
+test('needs-review รันซ้ำ → ไม่ skip ทำใหม่ได้', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    result: {
+      amountSatang: 35000, currency: 'THB', vatAmountSatang: 2290,
+      vendorName: 'x', issueDate: '2026-09-12', confidence: 0.5, rawText: 't',
+    },
+  });
+  const first = await runPipeline({ ...sb, ocr, minConf: 0.85 });
+  assert.equal(first.needsReview, 1);
+  const second = await runPipeline({ ...sb, ocr, minConf: 0.85 });
+  assert.deepEqual(second, { passed: 0, needsReview: 1, errors: 0, skipped: 0 });
+});
+
+// (10) error รันซ้ำต้องไม่ skip
+test('error รันซ้ำ → ไม่ skip ทำใหม่ได้', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => { throw new Error('boom-ocr'); };
+  const first = await runPipeline({ ...sb, ocr });
+  assert.equal(first.errors, 1);
+  const second = await runPipeline({ ...sb, ocr });
+  assert.deepEqual(second, { passed: 0, needsReview: 0, errors: 1, skipped: 0 });
+});

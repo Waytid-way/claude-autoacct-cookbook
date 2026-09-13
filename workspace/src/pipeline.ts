@@ -78,7 +78,9 @@ function loadSeenHashes(auditFile: string): Set<string> {
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     try {
-      const h = (JSON.parse(line) as { sha256?: unknown }).sha256;
+      const o = JSON.parse(line) as { sha256?: unknown; stage?: unknown };
+      if (o.stage !== 'export') continue; // pass-only: ocr/error/dedup-skip lines never count
+      const h = o.sha256;
       if (typeof h === 'string' && /^[0-9a-f]{64}$/.test(h)) seen.add(h);
     } catch { /* corrupt line: skip, never crash dedup */ }
   }
