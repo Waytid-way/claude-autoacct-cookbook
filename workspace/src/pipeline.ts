@@ -18,6 +18,8 @@ export interface RunPipelineOptions {
   auditFile: string;
   ocr: OcrFn;
   minConf?: number;
+  expenseAcct?: string;
+  cashAcct?: string;
 }
 
 export interface PipelineSummary {
@@ -27,8 +29,8 @@ export interface PipelineSummary {
   skipped: number;
 }
 
-const EXPENSE_ACCT = process.env.EXPENSE_ACCT ?? '5000-MEALS';
-const CASH_ACCT = process.env.CASH_ACCT ?? '1000-CASH';
+const DEFAULT_EXPENSE_ACCT = '5000-MEALS';
+const DEFAULT_CASH_ACCT = '1000-CASH';
 
 const cid = (): string => `autoacct-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -87,13 +89,13 @@ function loadSeenHashes(auditFile: string): Set<string> {
   return seen;
 }
 
-function mapToJournal(v: ValidatedReceipt, totalSatang: number, txDate: string): JournalEntry {
+function mapToJournal(v: ValidatedReceipt, totalSatang: number, txDate: string, expenseAcct: string, cashAcct: string): JournalEntry {
   return {
     correlationId: v.correlationId,
     txDate,
     lines: [
-      { accountCode: EXPENSE_ACCT, amountSatang: totalSatang, side: 'DEBIT' },
-      { accountCode: CASH_ACCT, amountSatang: totalSatang, side: 'CREDIT' },
+      { accountCode: expenseAcct, amountSatang: totalSatang, side: 'DEBIT' },
+      { accountCode: cashAcct, amountSatang: totalSatang, side: 'CREDIT' },
     ],
   };
 }
@@ -162,7 +164,7 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
         const vat = v.vatAmountSatang;
         const date = v.issueDate;
         if (total == null || vat == null || date == null) throw new Error('unreachable: gate passed with missing total/vat/date');
-        const journal = mapToJournal(v, total, date);
+        const journal = mapToJournal(v, total, date, opts.expenseAcct ?? DEFAULT_EXPENSE_ACCT, opts.cashAcct ?? DEFAULT_CASH_ACCT);
         writeFileSync(
           join(opts.outboxDir, `${correlationId}.json`),
           JSON.stringify(

@@ -238,3 +238,26 @@ test('error รันซ้ำ → ไม่ skip ทำใหม่ได้', 
   const second = await runPipeline({ ...sb, ocr });
   assert.deepEqual(second, { passed: 0, needsReview: 0, errors: 1, skipped: 0 });
 });
+
+// (11) บัญชี custom → journal ลงตาม options (default เดิมเมื่อไม่ส่ง)
+test('บัญชี custom → journal ลงตาม options', async () => {
+  const passOcr: OcrFn = async () => ({
+    model: 'mock',
+    result: {
+      amountSatang: 41250, currency: 'THB', vatAmountSatang: 2700,
+      vendorName: 'KHAO-TEST-VENDOR', issueDate: '2026-09-11', confidence: 0.99, rawText: 't',
+    },
+  });
+  const sbCustom = sandbox();
+  const custom = await runPipeline({ ...sbCustom, ocr: passOcr, expenseAcct: '6000-TEST', cashAcct: '1100-TEST' });
+  assert.equal(custom.passed, 1);
+  const customFiles = readdirSync(sbCustom.outboxDir).filter((f) => f.endsWith('.json'));
+  const customArtifact = JSON.parse(readFileSync(join(sbCustom.outboxDir, customFiles[0]), 'utf8')) as ExportArtifact;
+  assert.deepEqual(customArtifact.journal.lines.map((l) => l.accountCode), ['6000-TEST', '1100-TEST']);
+  const sbDefault = sandbox();
+  const def = await runPipeline({ ...sbDefault, ocr: passOcr });
+  assert.equal(def.passed, 1);
+  const defFiles = readdirSync(sbDefault.outboxDir).filter((f) => f.endsWith('.json'));
+  const defArtifact = JSON.parse(readFileSync(join(sbDefault.outboxDir, defFiles[0]), 'utf8')) as ExportArtifact;
+  assert.deepEqual(defArtifact.journal.lines.map((l) => l.accountCode), ['5000-MEALS', '1000-CASH']);
+});

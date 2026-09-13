@@ -94,4 +94,6 @@ await runPipeline({
   reviewDir: process.env.REVIEW_DIR ?? join(ROOT, 'needs-review'),
   auditFile: process.env.AUDIT_FILE ?? join(ROOT, 'audit.log.jsonl'),
   ocr: defaultOcr,
+  expenseAcct: process.env.EXPENSE_ACCT,
+  cashAcct: process.env.CASH_ACCT,
 });

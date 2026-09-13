@@ -21,6 +21,7 @@ Done = outbox artifact exists with balanced journal + audit lines per receipt + 
 - PROD default model is paid (`OCR_MODEL`, see `src/runner.ts`); override per run, never commit keys. `:free` models are DEV-only.
 - Money is Satang ints end to end; `totalBaht` in artifacts is display-only.
 - Gate threshold comes from `minConf` param (env `GATE_MIN_CONF` is the fallback; default lives in `src/gate.ts`) — prefer the param; never mutate env to pass values.
+- Journal accounts come from `expenseAcct`/`cashAcct` params (env `EXPENSE_ACCT`/`CASH_ACCT` read at runtime in `src/runner.ts`; defaults `5000-MEALS`/`1000-CASH` live in `src/pipeline.ts`) — never read env at import time.
 - Validate prefers exact triple (`total === base + vat`) when OCR returns `baseAmountSatang`; totals-only check is the fallback, not the rule.
 - Thai dates normalize (`DD/MM/YYYY`, Buddhist year −543) or the receipt fails the gate; unparseable dates are data, not crashes.
 - OCR fallback chain (`OCR_MODEL` + `OCR_FALLBACK`) tries in order; PROD warns and skips `:free` entries, continuing the chain.
