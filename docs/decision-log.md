@@ -33,6 +33,18 @@ Why did we make this decision? What alternatives did we consider?
 
 ---
 
+## 2026-09-13: Dedup pass-only (filter export)
+
+**Status:** Accepted
+
+**Context:**
+`loadSeenHashes` จำ sha256 จากทุก audit line รวม `ocr` line ทำให้ rerun ข้ามไฟล์ needs-review/error ผิด (#26)
+
+**Decision:**
+กรอง `stage==='export'` เท่านั้น; audit เก่าปล่อยไหล ไม่ migrate
+
+---
+
 ## 2026-09-12: Pi as Harness for AutoAcct
 
 **Status:** Accepted
