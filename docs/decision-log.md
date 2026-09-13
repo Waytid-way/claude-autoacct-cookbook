@@ -58,6 +58,21 @@ Cookbook มี code พร้อมใช้แต่ไม่มีตัว�
 
 ---
 
+## 2026-09-13: Harden slice from scout lessons + CDE stress
+
+**Status:** Accepted
+
+**Context:**
+Old-system scout found single-provider OCR, Thai-incompatible scorer, no dedup. Three CDE children stressed our answers before push and found real holes (unvalidated ISO dates, `:free` fallback in PROD, regex dedup store).
+
+**Decision:**
+Thai date normalize with round-trip check; OCR fallback chain that refuses `:free` in PROD with AggregateError; sha256 dedup via parsed audit log. Suite now 8/8.
+
+**Related:**
+- `workspace/AGENTS.md` (run/gotchas)
+
+---
+
 ## 2026-09-12: Express = Dhanakom desktop, mock :9000 is placeholder
 
 **Status:** Accepted
