@@ -30,7 +30,11 @@ _Avoid_: Training set
 
 **Entity Resolution**:
 Deciding two differently-named records are the same entity (e.g. invoice says "ABC Co." but GL says "ABC TH"). Recorded as a resolution note on the Evidence Link, never by silent rename.
-_Avoid_: name matching, dedup
+_Avoid_: name matching
+
+**Dedup-skip**:
+Skipping an already-passed file on rerun (sha256 in the audit log). File-level idempotency only — unrelated to Entity Resolution despite the shared word.
+_Avoid_: dedup (bare)
 
 **Negative Example**:
 A receipt the gate rejected or an entry later corrected. What the gate must learn to catch; GL alone never contains these.

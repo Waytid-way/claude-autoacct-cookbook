@@ -8,7 +8,7 @@ Pipeline slice: one receipt `inbox/` → `outbox/` or `needs-review/`, traced in
 cp sample/receipt-001.jpg inbox/   # seed one receipt
 APP_MODE=DEV node src/runner.ts    # mock, free, deterministic
 APP_MODE=PROD node src/runner.ts   # real OCR (needs key for paid default)
-npm test                           # black-box suite (must stay 8/8)
+npm test                           # black-box suite (must stay 9/9)
 node selfcheck.ts                  # gate checks (must stay 4/4)
 npm run typecheck                  # tsc (must stay green)
 ```

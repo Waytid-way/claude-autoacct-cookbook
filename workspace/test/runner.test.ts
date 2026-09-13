@@ -5,8 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { runPipeline } from '../src/pipeline.ts';
-import { normalizeThaiDate } from '../src/pipeline.ts';
+import { buildChain, normalizeThaiDate, runPipeline } from '../src/pipeline.ts';
 import type { OcrFn } from '../src/pipeline.ts';
 import type { ExportArtifact } from '../src/contract.ts';
 
@@ -170,6 +169,7 @@ test('วันที่ไทย พ.ศ./ค.ศ. normalize ถูก, ขย�
   assert.equal(normalizeThaiDate('12/09/2569'), '2026-09-12');
   assert.equal(normalizeThaiDate('12-09-2569'), '2026-09-12');
   assert.equal(normalizeThaiDate('12.09.2569'), '2026-09-12');
+  assert.equal(normalizeThaiDate('2569-09-12'), '2026-09-12'); // Buddhist-year ISO
   assert.equal(normalizeThaiDate('12/09/2026'), '2026-09-12');
   assert.equal(normalizeThaiDate('2026-09-12'), '2026-09-12');
   assert.equal(normalizeThaiDate(' 12/09/2569 '), '2026-09-12');
@@ -204,4 +204,11 @@ test('รันซ้ำ → skipped:1 ไม่มี outbox ใหม่', asy
   assert.deepEqual(second, { passed: 0, needsReview: 0, errors: 0, skipped: 1 });
   const audit = readFileSync(sb.auditFile, 'utf8');
   assert.ok(audit.includes('"stage":"dedup-skip"'));
+});
+
+// (8) buildChain: order + dedup + PROD :free filter
+test('buildChain เรียง ลบซ้ำ กรอง :free เฉพาะ PROD', () => {
+  assert.deepEqual(buildChain('a', ['b', 'a', 'c'], false), { models: ['a', 'b', 'c'], refused: [] });
+  assert.deepEqual(buildChain('a', ['x:free', 'b'], true), { models: ['a', 'b'], refused: ['x:free'] });
+  assert.deepEqual(buildChain('x:free', [], true), { models: [], refused: ['x:free'] });
 });

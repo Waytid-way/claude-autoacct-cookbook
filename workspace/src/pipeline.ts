@@ -38,7 +38,10 @@ const cid = (): string => `autoacct-${Date.now()}-${Math.random().toString(36).s
 export function normalizeThaiDate(s: string | null): string | null {
   if (!s) return null;
   const t = s.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return roundTrip(t);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    const y = Number(t.slice(0, 4));
+    return roundTrip(y > 2400 ? `${y - 543}${t.slice(4)}` : t); // Buddhist-year ISO
+  }
   const m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
   if (!m) return null;
   const y = Number(m[3]) > 2400 ? Number(m[3]) - 543 : Number(m[3]);
@@ -97,6 +100,24 @@ function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+// OCR model chain: primary first, deduped; PROD drops :free (DEV-only rule) and reports refusals.
+// ponytail: pure list surgery, no I/O — the only unit-testable slice of the OCR path
+export function buildChain(
+  primary: string,
+  fallbacks: string[],
+  prod: boolean,
+): { models: string[]; refused: string[] } {
+  const chain = [primary, ...fallbacks]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((m, i, a) => a.indexOf(m) === i);
+  if (!prod) return { models: chain, refused: [] };
+  return {
+    models: chain.filter((m) => !m.endsWith(':free')),
+    refused: chain.filter((m) => m.endsWith(':free')),
+  };
+}
+
 // Public seam: รันทั้ง pipeline (ocr → validate → gate → outbox/needs-review) พร้อม audit log
 export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSummary> {
   for (const d of [opts.inboxDir, opts.outboxDir, opts.reviewDir]) {
@@ -116,7 +137,6 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
         summary.skipped++;
         continue;
       }
-      seen.add(sha256);
       try {
         const { result, model, baseAmountSatang } = await opts.ocr(join(opts.inboxDir, f), correlationId);
         const v = validate(result, correlationId, baseAmountSatang);
@@ -165,8 +185,9 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
             2,
           ),
         );
-        log({ stage: 'export', verdict: 'pass', outbox: `${correlationId}.json` });
+        log({ stage: 'export', verdict: 'pass', sha256, outbox: `${correlationId}.json` });
         console.log(`${f} -> outbox/${correlationId}.json`);
+        seen.add(sha256); // remembered only on pass — review/error files stay rerunnable
         summary.passed++;
       } catch (e: unknown) {
         const msg = errorMessage(e).slice(0, 300);

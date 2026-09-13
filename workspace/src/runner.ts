@@ -2,7 +2,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import type { ReceiptOcrResult } from '../../recipes/03-vision-ocr/receipt-extraction/types.ts';
-import { runPipeline } from './pipeline.ts';
+import { buildChain, runPipeline } from './pipeline.ts';
 
 // Thin wrapper: CLI เดิม — config + default OCR แล้วมอบงานให้ runPipeline
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,13 +42,11 @@ async function defaultOcr(
       },
     };
   }
-  const chain = [OCR_MODEL, ...OCR_FALLBACK].filter((m, i, a) => a.indexOf(m) === i);
-  if (APP_MODE === 'PROD') {
-    const blocked = chain.filter((m) => m.endsWith(':free'));
-    if (blocked.length) console.warn(`PROD: refusing :free models (${blocked.join(',')}) — :free is DEV-only`);
-  }
+  const { models, refused } = buildChain(OCR_MODEL, OCR_FALLBACK, APP_MODE === 'PROD');
+  if (refused.length) console.warn(`PROD: refusing :free models (${refused.join(',')}) — :free is DEV-only`);
+  if (!models.length) throw new Error('No usable OCR models in PROD (all :free refused)');
   const attempts: unknown[] = [];
-  for (const model of APP_MODE === 'PROD' ? chain.filter((m) => !m.endsWith(':free')) : chain) {
+  for (const model of models) {
     try {
       return await runOcr(model, imagePath);
     } catch (e) {
@@ -56,7 +54,7 @@ async function defaultOcr(
       attempts.push(e);
     }
   }
-  throw new AggregateError(attempts, `OCR failed on all models (${chain.join(',')})`);
+  throw new AggregateError(attempts, `OCR failed on all models (${models.join(',')})`);
 }
 
 async function runOcr(
