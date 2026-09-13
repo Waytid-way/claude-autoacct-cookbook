@@ -33,6 +33,31 @@ Why did we make this decision? What alternatives did we consider?
 
 ---
 
+## 2026-09-13: Thermo hardening round (3 blockers)
+
+**Status:** Accepted
+
+**Context:**
+Thermo review สแกน `workspace/` (582 บรรทัด) เจอ structural blockers 3 ตัวใน `pipeline.ts` เส้นเดียว: dedup จำผิดไฟล์, review-write ซ้ำ + เช็กตาย, บัญชี freeze ตอน import (#26, #30)
+
+**Decision:**
+ซ่อมทั้งสามด้วย root-cause fix จุดเดียวต่อตัว: กรอง `stage==='export'`; `writeReviewFile` เดียว + เช็กตายเป็น throw invariant; บัญชีย้ายเข้า `RunPipelineOptions` ลายเดียวกับ `minConf`
+
+**Rationale:**
+- ทุกตัวเป็น shared-function guard เดียว ไม่กระจาย caller (ponytail root-cause rule)
+- ไม่แยกไฟล์ seen/config ใหม่ — YAGNI จนกว่า scale บังคับ
+- ไม่ migrate audit เก่า — rerun หนึ่งรอบล้างเอง ถูกกว่า migration
+
+**Consequences:**
+- ✅ Positive: rerun ถูก semantics, review path เดียว, บัญชี inject ได้; suite 9/9 → 12/12 + typecheck + selfcheck เขียวตลอด
+- ❌ Negative: throw invariant แทน review-write เดิม — ถ้า gate logic ผิดจริงจะนับเป็น error แทน needs-review (gate พิสูจน์แล้วว่าไปไม่ถึง)
+- ⚠️ Risk: ต่ำ — ทุก PR ผ่าน pr-review สองแกนก่อน merge
+
+**Related:**
+- #26, #27, PR #28 (Blocker 1) · PR #29 (Blocker 2) · #30, #31, PR #32 (Blocker 3)
+
+---
+
 ## 2026-09-13: Dedup-skip pass-only (filter export)
 
 **Status:** Accepted
