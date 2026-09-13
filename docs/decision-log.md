@@ -38,7 +38,7 @@ Why did we make this decision? What alternatives did we consider?
 **Status:** Accepted
 
 **Context:**
-Thermo review สแกน `workspace/` (582 บรรทัด) เจอ structural blockers 3 ตัวใน `pipeline.ts` เส้นเดียว: dedup จำผิดไฟล์, review-write ซ้ำ + เช็กตาย, บัญชี freeze ตอน import (#26, #30)
+Thermo review สแกน `workspace/` (582 บรรทัด) เจอ structural blockers 3 ตัวใน `pipeline.ts` เส้นเดียว: Dedup-skip จำผิดไฟล์, review-write ซ้ำ + เช็กตาย, บัญชี freeze ตอน import (#26, #30)
 
 **Decision:**
 ซ่อมทั้งสามด้วย root-cause fix จุดเดียวต่อตัว: กรอง `stage==='export'`; `writeReviewFile` เดียว + เช็กตายเป็น throw invariant; บัญชีย้ายเข้า `RunPipelineOptions` ลายเดียวกับ `minConf`
