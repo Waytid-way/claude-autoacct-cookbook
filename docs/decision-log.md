@@ -33,7 +33,7 @@ Why did we make this decision? What alternatives did we consider?
 
 ---
 
-## 2026-09-13: Dedup pass-only (filter export)
+## 2026-09-13: Dedup-skip pass-only (filter export)
 
 **Status:** Accepted
 
@@ -42,6 +42,17 @@ Why did we make this decision? What alternatives did we consider?
 
 **Decision:**
 กรอง `stage==='export'` เท่านั้น; audit เก่าปล่อยไหล ไม่ migrate
+
+**Rationale:**
+`ocr` line ไม่มี verdict ใช้กรองไม่ได้ ส่วน `export` line เกิดเฉพาะ pass จึงเป็นตัวกรองตรงจุดเดียว ไม่แยกไฟล์ seen ใหม่ (YAGNI)
+
+**Consequences:**
+- ✅ Positive: rerun ข้ามเฉพาะ pass; review/error ทำใหม่ได้เสมอ
+- ❌ Negative: audit เก่ามี ocr sha256 ค้าง rerun หนึ่งรอบอาจ skip ผิดครั้งเดียวแล้วหายเอง
+- ⚠️ Risk: ต่ำ — local rerun อย่างเดียว ไม่แตะ PROD
+
+**Related:**
+- #26 (spec), #27 (ticket), PR #28
 
 ---
 
