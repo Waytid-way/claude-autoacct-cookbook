@@ -815,3 +815,114 @@ test('Precedence Matrix: P5/P6 DHANAKOM_OUT env without export enabled -> does n
   });
   assert.equal(cfg.exportDhanakom, false);
 });
+
+// 6. Review report (ทางสายกลาง): HTML read-only รายครั้งจาก needs-review/ — เสกแล้วทิ้ง ไม่ post
+test('R1 review-report escapes hostile vendor, zero script, no external refs', async () => {
+  const { renderReviewReport } = await import('../src/review-report.ts');
+  const html = renderReviewReport([{
+    file: 'evil.jpg',
+    reasons: ['confidence 0.10 < 0.85'],
+    ocr: { vendorName: '<script>alert(1)</script>', issueDate: null, amountSatang: 12850, vatAmountSatang: 841, baseAmountSatang: 12009, confidence: 0.1 },
+    model: 'mock-evil',
+  }]);
+  assert.ok(!html.includes('<script'), 'must be zero-JS static report');
+  assert.ok(html.includes('&lt;script&gt;'), 'hostile vendor must be escaped');
+  assert.ok(!/src="http|href="http/.test(html), 'self-contained: no external refs');
+  assert.ok(html.includes('12850 === 12009 + 841'), 'exact triple line shown');
+});
+
+test('R2 review-report CLI: review dir + audit -> one html with reasons + sha', () => {
+  const sb = sandbox();
+  mkdirSync(sb.reviewDir, { recursive: true });
+  const cid = 'autoacct-test-1';
+  writeFileSync(join(sb.reviewDir, `${cid}.json`), JSON.stringify({
+    file: 'low.jpg', reasons: ['confidence 0.72 < 0.85'],
+    ocr: { vendorName: 'ร้านข้าวแกง', issueDate: '2025-09-12', amountSatang: 12850, vatAmountSatang: 841, confidence: 0.72 },
+    model: 'mock-low',
+  }));
+  writeFileSync(sb.auditFile, JSON.stringify({ correlationId: cid, stage: 'ocr', sha256: 'ab'.repeat(32) }) + '\n');
+  const out = join(sb.dir, 'review-report.html');
+  execFileSync('node', ['src/review-report.ts', '--review', sb.reviewDir, '--out', out, '--audit', sb.auditFile], {
+    cwd: ROOT, encoding: 'utf8', timeout: 60000,
+  });
+  const html = readFileSync(out, 'utf8');
+  assert.ok(html.includes('ร้านข้าวแกง'));
+  assert.ok(html.includes('confidence 0.72 &lt; 0.85'), 'reason escaped, not raw <');
+  assert.ok(html.includes('ab'.repeat(32)), 'sha from audit attached');
+});
+
+test('R3 review-report empty dir -> zero-case message, still valid html', async () => {
+  const { loadReviewDir, renderReviewReport } = await import('../src/review-report.ts');
+  const empty = join(mkdtempSync(join(tmpdir(), 'autoacct-empty-')), 'noreview');
+  assert.deepEqual(loadReviewDir(empty), []);
+  const html = renderReviewReport([]);
+  assert.ok(html.includes('ไม่มีเคสใน needs-review'));
+});
+
+test('R4 review-report embeds per-case reply block with cid', async () => {
+  const { renderReviewReport } = await import('../src/review-report.ts');
+  const html = renderReviewReport([{
+    file: 'low.jpg', reasons: ['confidence 0.72 < 0.85'],
+    ocr: { vendorName: 'ร้านข้าวแกง', issueDate: '2025-09-12', amountSatang: 12850, vatAmountSatang: 841, confidence: 0.72 },
+    model: 'mock-low', correlationId: 'autoacct-test-9',
+  }]);
+  assert.ok(html.includes('แบบตอบ'));
+  assert.ok(html.includes('autoacct-test-9'));
+  assert.ok(html.includes('ตอบคำถาม Pi'), 'primary channel is answering Pi questions');
+  assert.ok(html.includes('ยืนยันตามนี้') && html.includes('ขอหลักฐานเพิ่ม'));
+});
+
+// (14) Conflict tiered hold: name-match เจอ 2 บัญชีต่างกัน → hold ระบุทั้งคู่ ห้าม silent pick
+const conflictKb = {
+  vendorMappings: [
+    { vendorNamePattern: 'abc food', expenseAcct: '5000-MEALS' },
+    { vendorNamePattern: 'travel', expenseAcct: '5000-TRAVEL' },
+    { taxId: '0105558000123', expenseAcct: '5100-OFFICE' },
+  ],
+};
+const conflictOcr = (extra: object = {}): OcrFn => async () => ({
+  model: 'mock',
+  result: {
+    amountSatang: 462000, currency: 'THB', vatAmountSatang: 30224,
+    vendorName: 'ABC FOOD and Travel Services',
+    issueDate: '2026-09-14', confidence: 0.95, rawText: 't',
+    ...extra,
+  },
+  baseAmountSatang: 431776,
+});
+
+test('Conflict C1: name-match 2 บัญชี ไม่มี taxId → needs-review ระบุทั้งคู่ + ไม่มี outbox', async () => {
+  const sb = sandbox();
+  const summary = await runPipeline({ ...sb, ocr: conflictOcr(), clientKb: conflictKb });
+  assert.deepEqual(summary, { passed: 0, needsReview: 1, errors: 0, skipped: 0 });
+  assert.equal(readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json')).length, 0);
+  const reviewFiles = readdirSync(sb.reviewDir).filter((f) => f.endsWith('.json'));
+  const review = JSON.parse(readFileSync(join(sb.reviewDir, reviewFiles[0]), 'utf8')) as { reasons: string[] };
+  assert.ok(review.reasons.some((r) => r.startsWith('conflict:') && r.includes('5000-MEALS') && r.includes('5000-TRAVEL')));
+});
+
+test('Conflict C2: TaxID ตรง → Tier 1 ชนะ auto-pass ลงบัญชี tax rule', async () => {
+  const sb = sandbox();
+  const summary = await runPipeline({
+    ...sb, ocr: conflictOcr({ taxId: '0-1055-58000-12-3' }), clientKb: conflictKb,
+  });
+  assert.equal(summary.passed, 1);
+  const files = readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json'));
+  const art = JSON.parse(readFileSync(join(sb.outboxDir, files[0]), 'utf8')) as ExportArtifact;
+  assert.deepEqual(art.journal.lines.map((l) => l.accountCode), ['5100-OFFICE', '1000-CASH']);
+});
+
+test('Conflict C3: name-match 2 rules บัญชีเดียวกัน → agreement ไม่ hold', async () => {
+  const sb = sandbox();
+  const summary = await runPipeline({
+    ...sb,
+    ocr: conflictOcr(),
+    clientKb: {
+      vendorMappings: [
+        { vendorNamePattern: 'abc food', expenseAcct: '5000-MEALS' },
+        { vendorNamePattern: 'food and', expenseAcct: '5000-MEALS' },
+      ],
+    },
+  });
+  assert.equal(summary.passed, 1);
+});

@@ -4,7 +4,7 @@ import { join, basename } from 'node:path';
 import type { ReceiptOcrResult } from '../../recipes/03-vision-ocr/receipt-extraction/types.ts';
 import type { JournalEntry, ValidatedReceipt } from './contract.ts';
 import { gate } from './gate.ts';
-import { resolveAccounts, type ClientKnowledge } from './kb-resolver.ts';
+import { resolveAccounts, matchTaxId, findConflictingAccounts, type ClientKnowledge } from './kb-resolver.ts';
 
 // Boundary seam: OCR ด้านนอกถูก inject ผ่าน OcrFn — test ใช้ mock เท่านั้น ห้ามยิง network/pi CLI
 export type OcrFn = (
@@ -153,8 +153,13 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
       try {
         const { result, model, baseAmountSatang } = await opts.ocr(join(opts.inboxDir, f), correlationId);
         const v = validate(result, correlationId, baseAmountSatang);
+        // Tiered hold (Conflict): TaxID exact auto-passes; ≥2 distinct Tier-2
+        // accounts hold as needs-review naming both sides — never silently picked.
+        const taxHit = opts.clientKb ? matchTaxId(v, opts.clientKb) : undefined;
+        const rivals = !taxHit && opts.clientKb ? findConflictingAccounts(v, opts.clientKb) : [];
+        const hold = rivals.length > 1;
         const resolved = opts.clientKb ? resolveAccounts(v, opts.clientKb) : undefined;
-        const d = gate(v, opts.minConf, resolved);
+        const d = gate(v, opts.minConf, hold ? undefined : resolved, hold ? rivals : undefined);
         log({ stage: 'ocr', model, sha256, amountSatang: v.amountSatang, confidence: v.confidence });
         if (d.verdict === 'needs-review') {
           writeReviewFile(opts.reviewDir, correlationId, f, d.reasons, v, model);

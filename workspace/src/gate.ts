@@ -7,6 +7,7 @@ export function gate(
   r: ValidatedReceipt,
   minConf: number = Number(process.env.GATE_MIN_CONF ?? DEFAULT_MIN_CONF),
   resolvedAccounts?: ResolvedAccounts | null,
+  conflictAccounts?: string[],
 ): GateDecision {
   const reasons: string[] = [];
   if (r.amountSatang == null) reasons.push('missing total');
@@ -15,6 +16,9 @@ export function gate(
   if (!r.vatCheckOk) reasons.push('vat cross-check failed (total != base + vat)');
   if ((r.confidence ?? 0) < minConf) reasons.push(`confidence ${(r.confidence ?? 0).toFixed(2)} < ${minConf}`);
   if (resolvedAccounts === null) reasons.push('unknown vendor');
+  if (conflictAccounts && conflictAccounts.length > 1) {
+    reasons.push(`conflict: ${conflictAccounts.join(' vs ')} — needs human pick`);
+  }
   return { verdict: reasons.length ? 'needs-review' : 'pass', reasons };
 }
 
