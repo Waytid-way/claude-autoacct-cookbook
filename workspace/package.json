@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "run": "node src/runner.ts",
     "check": "node selfcheck.ts",
+    "run": "node src/runner.ts",
+    "export:dhanakom": "node src/runner.ts --export-dhanakom",
     "test": "node --test test/runner.test.ts",
     "typecheck": "/data/data/com.termux/files/usr/tmp/tscheck/node_modules/.bin/tsc --noEmit --skipLibCheck --module nodenext --target es2022 --allowImportingTsExtensions --typeRoots /data/data/com.termux/files/usr/tmp/tscheck/node_modules/@types selfcheck.ts src/contract.ts src/gate.ts src/pipeline.ts src/runner.ts test/runner.test.ts"
   }

@@ -393,4 +393,425 @@ test('Dhanakom Bridge: export unexported outbox files to CSV with audit idempote
   assert.deepEqual(outboxFiles, outboxFilesAfter);
 });
 
+// ==========================================
+// Slice 1: CLI Configuration Seam Tests
+// ==========================================
 
+// Helper to run runner.ts via process boundary
+function runCli(args: string[], env: Record<string, string | undefined> = {}, cwd: string = ROOT) {
+  try {
+    const stdout = execFileSync('node', ['src/runner.ts', ...args], {
+      cwd,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return { status: 0, stdout, stderr: '' };
+  } catch (e: any) {
+    return {
+      status: e.status ?? 1,
+      stdout: e.stdout?.toString() ?? '',
+      stderr: e.stderr?.toString() ?? e.message,
+    };
+  }
+}
+
+// 1. Existing no-CLI behavior still works (tested in characterization, plus explicit check)
+test('CLI 1: no-CLI args uses defaults/env normally', () => {
+  const sb = sandbox();
+  const res = runCli([], {
+    APP_MODE: 'DEV',
+    INBOX_DIR: sb.inboxDir,
+    OUTBOX_DIR: sb.outboxDir,
+    REVIEW_DIR: sb.reviewDir,
+    AUDIT_FILE: sb.auditFile,
+  });
+  assert.equal(res.status, 0);
+  assert.equal(readdirSync(sb.outboxDir).length, 1);
+});
+
+// 2. CLI override ENV
+test('CLI 2: CLI directory flag overrides ENV variable', () => {
+  const sb1 = sandbox();
+  const sb2 = sandbox(); // override target
+  mkdirSync(sb1.outboxDir, { recursive: true });
+  mkdirSync(sb2.outboxDir, { recursive: true });
+  const res = runCli(['--outbox', sb2.outboxDir], {
+    APP_MODE: 'DEV',
+    INBOX_DIR: sb1.inboxDir,
+    OUTBOX_DIR: sb1.outboxDir, // Should be overridden!
+    REVIEW_DIR: sb1.reviewDir,
+    AUDIT_FILE: sb1.auditFile,
+  });
+  assert.equal(res.status, 0);
+  assert.equal(readdirSync(sb1.outboxDir).length, 0);
+  assert.equal(readdirSync(sb2.outboxDir).length, 1);
+});
+
+// 3. ENV used when CLI not specified
+test('CLI 3: ENV used when CLI flag is absent', () => {
+  const sb = sandbox();
+  const res = runCli([], {
+    APP_MODE: 'DEV',
+    INBOX_DIR: sb.inboxDir,
+    OUTBOX_DIR: sb.outboxDir,
+    REVIEW_DIR: sb.reviewDir,
+    AUDIT_FILE: sb.auditFile,
+  });
+  assert.equal(res.status, 0);
+  assert.equal(readdirSync(sb.outboxDir).length, 1);
+});
+
+// 4. Default used when neither CLI nor ENV is provided (checked by runner config unit check)
+test('CLI 4: default used when neither CLI nor ENV is provided', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({ root: '/test-root', args: [], env: {} });
+  assert.equal(cfg.inboxDir, '/test-root/inbox');
+  assert.equal(cfg.outboxDir, '/test-root/outbox');
+});
+
+// 5. --client-kb valid -> pipeline receives client KB and matches vendor
+test('CLI 5: --client-kb valid -> pipeline applies client vendor mapping', () => {
+  const sb = sandbox();
+  const kbFile = join(sb.dir, 'client-a.json');
+  writeFileSync(
+    kbFile,
+    JSON.stringify({
+      clientName: 'Client A',
+      vendorMappings: [
+        { vendorNamePattern: 'ร้านกาแฟ', expenseAcct: '5300-COFFEE', cashAcct: '1000-CASH' },
+      ],
+    }),
+  );
+
+  const res = runCli(['--client-kb', kbFile, '--inbox', sb.inboxDir, '--outbox', sb.outboxDir, '--review', sb.reviewDir, '--audit', sb.auditFile], {
+    APP_MODE: 'DEV',
+  });
+  assert.equal(res.status, 0);
+  const files = readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json'));
+  assert.equal(files.length, 1);
+  const art = JSON.parse(readFileSync(join(sb.outboxDir, files[0]), 'utf8')) as ExportArtifact;
+  assert.equal(art.journal.lines[0].accountCode, '5300-COFFEE');
+});
+
+// 6. --client-kb missing file -> non-zero exit code
+test('CLI 6: --client-kb missing file -> non-zero exit', () => {
+  const sb = sandbox();
+  const missingPath = join(sb.dir, 'does-not-exist.json');
+  const res = runCli(['--client-kb', missingPath], { APP_MODE: 'DEV' });
+  assert.notEqual(res.status, 0);
+  assert.ok(res.stderr.includes('Client KB file not found'));
+});
+
+// 7. --client-kb invalid JSON -> non-zero exit code
+test('CLI 7: --client-kb invalid JSON -> non-zero exit', () => {
+  const sb = sandbox();
+  const corruptFile = join(sb.dir, 'corrupt.json');
+  writeFileSync(corruptFile, '{ invalid json');
+  const res = runCli(['--client-kb', corruptFile], { APP_MODE: 'DEV' });
+  assert.notEqual(res.status, 0);
+  assert.ok(res.stderr.includes('Invalid JSON in Client KB file'));
+});
+
+// 8. Invalid KB -> no output journal generated (pipeline MUST NOT run/fallback)
+test('CLI 8: invalid KB -> pipeline does not execute, zero outbox artifacts', () => {
+  const sb = sandbox();
+  const corruptFile = join(sb.dir, 'corrupt.json');
+  writeFileSync(corruptFile, '{"notValidKb": true}');
+  const res = runCli(['--client-kb', corruptFile, '--inbox', sb.inboxDir, '--outbox', sb.outboxDir], { APP_MODE: 'DEV' });
+  assert.notEqual(res.status, 0);
+  // outbox directory should not even be created or should remain empty
+  const count = existsSync(sb.outboxDir) ? readdirSync(sb.outboxDir).length : 0;
+  assert.equal(count, 0);
+});
+
+// 9. Unknown CLI option -> non-zero descriptive failure
+test('CLI 9: unknown CLI option -> non-zero exit', () => {
+  const res = runCli(['--mystery-flag'], { APP_MODE: 'DEV' });
+  assert.notEqual(res.status, 0);
+  assert.ok(res.stderr.includes('Unknown option') || res.stderr.includes('--mystery-flag'));
+});
+
+// ==========================================
+// Slice 2: Dhanakom Bridge Integration Tests
+// ==========================================
+
+// TEST A: first export -> expected CSV generated & bridge-export audit record exists
+test('Dhanakom CLI A: first export generates CSV and bridge-export audit record', () => {
+  const sb = sandbox();
+  const csvPath = join(sb.dir, 'export-a.csv');
+  const res = runCli([
+    '--export-dhanakom',
+    '--dhanakom-out', csvPath,
+    '--inbox', sb.inboxDir,
+    '--outbox', sb.outboxDir,
+    '--review', sb.reviewDir,
+    '--audit', sb.auditFile,
+  ], { APP_MODE: 'DEV' });
+
+  assert.equal(res.status, 0);
+  assert.ok(existsSync(csvPath));
+  const content = readFileSync(csvPath, 'utf8');
+  assert.ok(content.includes('Date,VoucherRef,AccountCode,Debit,Credit,Description,TaxId'));
+  assert.ok(content.includes('5000-MEALS,350.00,0.00'));
+  assert.ok(content.includes('1000-CASH,0.00,350.00'));
+
+  const audit = readFileSync(sb.auditFile, 'utf8');
+  assert.ok(audit.includes('"stage":"bridge-export"'));
+});
+
+// TEST B: same export again -> previously exported entries skipped, zero duplicate CSV entries
+test('Dhanakom CLI B: second export skips previously exported entries (idempotent)', () => {
+  const sb = sandbox();
+  const csvPath1 = join(sb.dir, 'export-b1.csv');
+  const csvPath2 = join(sb.dir, 'export-b2.csv');
+  const runArgs = [
+    '--export-dhanakom',
+    '--inbox', sb.inboxDir,
+    '--outbox', sb.outboxDir,
+    '--review', sb.reviewDir,
+    '--audit', sb.auditFile,
+  ];
+
+  const res1 = runCli([...runArgs, '--dhanakom-out', csvPath1], { APP_MODE: 'DEV' });
+  assert.equal(res1.status, 0);
+  assert.ok(existsSync(csvPath1));
+
+  // Run again
+  const res2 = runCli([...runArgs, '--dhanakom-out', csvPath2], { APP_MODE: 'DEV' });
+  assert.equal(res2.status, 0);
+  assert.ok(!existsSync(csvPath2)); // No new CSV created when everything is skipped
+});
+
+// TEST C: new outbox item after previous export -> only new item exported, old item skipped
+test('Dhanakom CLI C: new outbox item exported while old item remains skipped', () => {
+  const sb = sandbox();
+  const csvPath1 = join(sb.dir, 'export-c1.csv');
+  const csvPath2 = join(sb.dir, 'export-c2.csv');
+  const runArgs = [
+    '--export-dhanakom',
+    '--inbox', sb.inboxDir,
+    '--outbox', sb.outboxDir,
+    '--review', sb.reviewDir,
+    '--audit', sb.auditFile,
+  ];
+
+  // First run
+  runCli([...runArgs, '--dhanakom-out', csvPath1], { APP_MODE: 'DEV' });
+  assert.ok(existsSync(csvPath1));
+
+  // Add a SECOND outbox artifact manually
+  const secondArtifact: ExportArtifact = {
+    correlationId: 'autoacct-test-2nd',
+    vendorName: 'NEW VENDOR CO',
+    issueDate: '2026-09-15',
+    totalSatang: 12000,
+    vatSatang: 0,
+    totalBaht: 120,
+    vatBaht: 0,
+    taxId: '1111111111111',
+    ocrModel: 'test',
+    journal: {
+      correlationId: 'autoacct-test-2nd',
+      txDate: '2026-09-15',
+      lines: [
+        { accountCode: '5900-OTHER', amountSatang: 12000, side: 'DEBIT' },
+        { accountCode: '1000-CASH', amountSatang: 12000, side: 'CREDIT' },
+      ],
+    },
+  };
+  writeFileSync(join(sb.outboxDir, 'second-outbox.json'), JSON.stringify(secondArtifact, null, 2));
+
+  // Second run with second CSV path
+  const res2 = runCli([...runArgs, '--dhanakom-out', csvPath2], { APP_MODE: 'DEV' });
+  assert.equal(res2.status, 0);
+  assert.ok(existsSync(csvPath2));
+  const content2 = readFileSync(csvPath2, 'utf8');
+  assert.ok(content2.includes('NEW VENDOR CO'));
+  assert.ok(content2.includes('5900-OTHER,120.00,0.00'));
+  // Old item (350.00) MUST NOT be in the new export
+  assert.ok(!content2.includes('350.00'));
+});
+
+// TEST D: custom CSV path works via CLI
+test('Dhanakom CLI D: custom --dhanakom-out path is respected', () => {
+  const sb = sandbox();
+  const customCsv = join(sb.dir, 'nested', 'custom-output.csv');
+  mkdirSync(join(sb.dir, 'nested'), { recursive: true });
+
+  const res = runCli([
+    '--export-dhanakom',
+    '--dhanakom-out', customCsv,
+    '--inbox', sb.inboxDir,
+    '--outbox', sb.outboxDir,
+    '--review', sb.reviewDir,
+    '--audit', sb.auditFile,
+  ], { APP_MODE: 'DEV' });
+
+  assert.equal(res.status, 0);
+  assert.ok(existsSync(customCsv));
+});
+
+// TEST E: invalid --dhanakom-out without --export-dhanakom -> non-zero, no bridge execution
+test('Dhanakom CLI E: --dhanakom-out without --export-dhanakom rejects with non-zero', () => {
+  const sb = sandbox();
+  const res = runCli(['--dhanakom-out', join(sb.dir, 'orphan.csv')], { APP_MODE: 'DEV' });
+  assert.notEqual(res.status, 0);
+  assert.ok(res.stderr.includes('--dhanakom-out specified without --export-dhanakom'));
+  assert.ok(!existsSync(join(sb.dir, 'orphan.csv')));
+});
+
+// TEST F: audit record contains sha256 identity
+test('Dhanakom CLI F: audit record logs sha256s correctly', () => {
+  const sb = sandbox();
+  const csvPath = join(sb.dir, 'audit-test.csv');
+  runCli([
+    '--export-dhanakom',
+    '--dhanakom-out', csvPath,
+    '--inbox', sb.inboxDir,
+    '--outbox', sb.outboxDir,
+    '--review', sb.reviewDir,
+    '--audit', sb.auditFile,
+  ], { APP_MODE: 'DEV' });
+
+  const auditLines = readFileSync(sb.auditFile, 'utf8')
+    .split('\n')
+    .filter((l) => l.trim())
+    .map((l) => JSON.parse(l));
+  const bridgeLine = auditLines.find((l) => l.stage === 'bridge-export');
+  assert.ok(bridgeLine);
+  assert.ok(Array.isArray(bridgeLine.sha256s));
+  assert.equal(bridgeLine.sha256s.length, 1);
+  assert.match(bridgeLine.sha256s[0], /^[0-9a-f]{64}$/);
+});
+
+// =======================================================
+// Configuration Precedence Contract v1: Decision Table Tests
+// =======================================================
+
+// 1. Directory Matrix: per-field test (C4)
+test('Precedence Matrix: C4 partial CLI override is strictly per-field', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({
+    root: '/root',
+    args: ['--inbox', '/cli/inbox'],
+    env: {
+      INBOX_DIR: '/env/inbox',
+      OUTBOX_DIR: '/env/outbox',
+      REVIEW_DIR: '/env/review',
+      AUDIT_FILE: '/env/audit.log',
+    },
+  });
+  assert.equal(cfg.inboxDir, '/cli/inbox'); // CLI won
+  assert.equal(cfg.outboxDir, '/env/outbox'); // ENV won
+  assert.equal(cfg.reviewDir, '/env/review'); // ENV won
+  assert.equal(cfg.auditFile, '/env/audit.log'); // ENV won
+});
+
+// 2. Client KB Matrix: K4 Invalid CLI does NOT fallback to valid ENV
+test('Precedence Matrix: K4 invalid CLI KB does not fallback to valid ENV KB', () => {
+  const sb = sandbox();
+  const validEnvKb = join(sb.dir, 'valid-env.json');
+  writeFileSync(validEnvKb, JSON.stringify({
+    clientName: 'Env Client',
+    vendorMappings: [{ vendorNamePattern: 'test', expenseAcct: '5001-ENV' }],
+  }));
+  const missingCliPath = join(sb.dir, 'missing-cli.json');
+
+  const res = runCli(['--client-kb', missingCliPath], {
+    APP_MODE: 'DEV',
+    CLIENT_KB_PATH: validEnvKb,
+  });
+
+  assert.notEqual(res.status, 0);
+  assert.ok(res.stderr.includes('Client KB file not found'));
+});
+
+// 3. Client KB Matrix: K2 Unset CLI + valid ENV KB -> load ENV KB
+test('Precedence Matrix: K2 unset CLI with valid ENV KB loads successfully', () => {
+  const sb = sandbox();
+  const validEnvKb = join(sb.dir, 'valid-env.json');
+  writeFileSync(validEnvKb, JSON.stringify({
+    clientName: 'Env Client',
+    vendorMappings: [{ vendorNamePattern: 'ร้านกาแฟ', expenseAcct: '5001-ENV', cashAcct: '1000-CASH' }],
+  }));
+
+  const res = runCli(['--inbox', sb.inboxDir, '--outbox', sb.outboxDir, '--review', sb.reviewDir, '--audit', sb.auditFile], {
+    APP_MODE: 'DEV',
+    CLIENT_KB_PATH: validEnvKb,
+  });
+
+  assert.equal(res.status, 0);
+  const files = readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json'));
+  assert.equal(files.length, 1);
+  const art = JSON.parse(readFileSync(join(sb.outboxDir, files[0]), 'utf8')) as ExportArtifact;
+  assert.equal(art.journal.lines[0].accountCode, '5001-ENV');
+});
+
+// 4. Dhanakom Export Enablement Matrix: E1 - E5
+test('Precedence Matrix: E1 unset CLI + unset ENV -> export false', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({ root: '/root', args: [], env: {} });
+  assert.equal(cfg.exportDhanakom, false);
+});
+
+test('Precedence Matrix: E2 unset CLI + ENV true -> export true', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({ root: '/root', args: [], env: { EXPORT_DHANAKOM: 'true' } });
+  assert.equal(cfg.exportDhanakom, true);
+});
+
+test('Precedence Matrix: E3 CLI present + ENV false -> export true (CLI wins)', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({ root: '/root', args: ['--export-dhanakom'], env: { EXPORT_DHANAKOM: 'false' } });
+  assert.equal(cfg.exportDhanakom, true);
+});
+
+test('Precedence Matrix: E4 absent CLI + invalid ENV -> ERROR', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  assert.throws(
+    () => resolveRunnerConfig({ root: '/root', args: [], env: { EXPORT_DHANAKOM: 'not-a-boolean' } }),
+    /Invalid EXPORT_DHANAKOM value/,
+  );
+});
+
+test('Precedence Matrix: E5 present CLI + invalid ENV -> export true (CLI precedence ignores unused ENV)', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({
+    root: '/root',
+    args: ['--export-dhanakom'],
+    env: { EXPORT_DHANAKOM: 'garbage-env' },
+  });
+  assert.equal(cfg.exportDhanakom, true);
+});
+
+// 5. Dhanakom Output Path Matrix: P1 - P6
+test('Precedence Matrix: P2 unset CLI + DHANAKOM_OUT env -> env path used when enabled', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({
+    root: '/root',
+    args: ['--export-dhanakom'],
+    env: { DHANAKOM_OUT: '/custom/from-env.csv' },
+  });
+  assert.equal(cfg.dhanakomOutPath, '/custom/from-env.csv');
+});
+
+test('Precedence Matrix: P3 CLI output > ENV output', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({
+    root: '/root',
+    args: ['--export-dhanakom', '--dhanakom-out', '/cli/path.csv'],
+    env: { DHANAKOM_OUT: '/env/path.csv' },
+  });
+  assert.equal(cfg.dhanakomOutPath, '/cli/path.csv');
+});
+
+test('Precedence Matrix: P5/P6 DHANAKOM_OUT env without export enabled -> does not enable export', async () => {
+  const { resolveRunnerConfig } = await import('../src/config.ts');
+  const cfg = resolveRunnerConfig({
+    root: '/root',
+    args: [],
+    env: { DHANAKOM_OUT: '/env/path.csv' }, // without EXPORT_DHANAKOM=true
+  });
+  assert.equal(cfg.exportDhanakom, false);
+});
