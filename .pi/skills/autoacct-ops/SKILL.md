@@ -12,7 +12,7 @@ Use this skill when an accountant or operator asks to process receipts, load a s
 
 - **AI proposes; control system decides:** Pi acts strictly as the conversational orchestration and presentation layer. Pi is NEVER an accounting authority.
 - **Deterministic CLI Execution:** All pipeline and export operations must invoke `workspace/src/runner.ts` via shell. Never attempt direct TypeScript function imports or bypass the CLI seam.
-- **Read-Only Review:** When reviewing items in `needs-review/`, Pi presents vendor, amount, and reasons in plain language for human inspection. Pi MUST NOT mutate review files, MUST NOT write to Client KB, and MUST NOT infer or auto-post account codes.
+- **Read-Only Review:** When reviewing items in `needs-review/`, Pi presents vendor, amount, and reasons in plain language for human inspection. Pi MUST NOT mutate review files, MUST NOT write to Client KB, and MUST NOT infer or auto-post account codes. The ONLY files Desk mode may write are `workspace/feedback/YYYY-MM-DD.md` (EOD quality notes, append-only).
 - **US13 Hard Boundary (Out of Scope):** Candidate mapping, Edge Log mutation, and knowledge write-back are NOT implemented in this version.
 - **Safety First:** Always run in `APP_MODE=DEV` unless the human operator explicitly requests and confirms `PROD` execution. Never invent client paths or account codes.
 
@@ -91,6 +91,35 @@ When `needs-review` count > 0, inspect the `.json` files in the review directory
 - วันที่ (Date): [ocr.issueDate หรือ "ไม่มี"]
 - สาเหตุที่ติดตรวจ (Reasons): [d.reasons หรือ "unknown vendor", "vat cross-check failed"]
 ```
+
+### Decision Capture (ask_user_question — primary channel)
+
+After presenting a case, capture the accountant's decision with the `ask_user_question` tool — do NOT ask them to copy-paste a text template. One case per call (options differ per case). Rules:
+
+- Ask verdict first (single question, 2–3 options): `ยืนยันตามนี้` / `แก้ไข` / `ขอหลักฐานเพิ่ม`. Follow up conditionally in a second call: conflict → side pick; แก้ไข → corrected values; any verdict → reason.
+- Conflict side-pick options MUST come only from the review JSON / KB refs with support counts (e.g. `5000-MEALS — 14 ครั้ง edge-009/011`). Never invent an account code as an option.
+- Reason question: offer at most 1 neutral preset (e.g. `ยืนตามหลักฐานในรายงาน`) and rely on the built-in `Type something.` row for the real reason — never author reason options that put words in the accountant's mouth.
+- Tool limits (hard): header ≤ 16 chars, option label ≤ 60 chars, 2–4 options per question, ≤ 4 questions per call, first option + `(Recommended)` when evidence supports one. Never author `Other`/`Type something.` labels (reserved).
+- After answers: echo the captured decision back in Thai, remind that posting happens manually in Dhanakom (US13: no write-back yet), and never mutate review/KB files.
+- The markdown template (`workspace/review-reply.template.md`) is fallback only — async/offline review where the harness tool is unavailable.
+
+### End-of-Day Quality Review (3 questions, then log)
+
+After the evening close (skipped/errors checked, audit complete), run ONE `ask_user_question` call (≤ 3 questions) so the accountant rates the day. Small and fixed — never improvise extra questions:
+
+1. Header `ภาพรวมวันนี้`: `ราบรื่น` / `ติดขัดเล็กน้อย` / `ติดขัดมาก`.
+2. Header `สะดุดตรงไหน`: `สรุปผล` / `คำถามตัดสิน` / `รายงาน HTML` / `export` (4th slot left for the built-in `Type something.` row — never add a 5th option).
+3. Header `แก้1อย่าง`: single option `ไม่มี — วันนี้โอเค`, real answer expected via `Type something.`.
+
+Then append to `workspace/feedback/YYYY-MM-DD.md` (create with `mkdir -p` if missing):
+
+```markdown
+# Feedback YYYY-MM-DD (Desk → Builder)
+- ภาพรวม: <answer 1> / สะดุด: <answer 2> — <reviewer>
+- [ ] <answer 3 verbatim> (skip checkbox when answer is "ไม่มี — วันนี้โอเค": write "- ไม่มีงานค้าง" instead)
+```
+
+Echo back what was saved and end the session's work — never fix code in a Desk session, even a one-line fix. Builder triages `- [ ]` items next session (tick `- [x]` + fix ref, never delete).
 
 ### Strict Prohibition
 - DO NOT edit the review JSON files.

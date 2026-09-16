@@ -76,3 +76,7 @@ _Avoid_: Smart vendor search, AI vendor guesser
 The audit event recording that a validated journal entry in `outbox/` was included in a Dhanakom export batch. Prevents duplicate exports while preserving file immutability.
 _Avoid_: mark as exported, move to archive
 
+**Review Decision**:
+The accountant's ruling on one needs-review case — confirm as-is, correct fields, or request more evidence — plus a reason. A confirm/correct ruling with an account choice becomes a Candidate; the reason becomes the resolution note on the Evidence Link. A gate verdict is the pipeline's output, never a Review Decision.
+_Avoid_: verdict (bare — say whose: gate verdict vs Review Decision), auto-pass
+

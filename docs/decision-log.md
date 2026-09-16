@@ -4,6 +4,93 @@
 
 ---
 
+## 2026-09-16 (night): Conflict tiered hold enforced in code
+
+**Status:** Accepted (domain-modeling audit found `resolveAccounts` silently first-match-wins against the Conflict definition)
+
+**Context:**
+Glossary says same vendor+type → two accounts must surface both sides, never silently pick. Code used `.find()` (first match wins) and gate passed it to outbox. Support counts don't exist anywhere yet (KB has rules only).
+
+**Decision:**
+Tiered hold per Canonical Vendor Lookup order: Tier 1 exact TaxID still auto-passes (deterministic); Tier 2 name-match with ≥2 *distinct* accounts holds as `needs-review` with reason `conflict: A vs B — needs human pick`. Same account twice = agreement, no hold. Counts deferred until KB tracks them — the reason names accounts, not counts, for now.
+
+**Consequences:**
+- ✅ Positive: glossary and pipeline agree; prototypes' "no auto-pick" claim is now true.
+- ❌ Negative: more needs-review volume on ambiguous vendors (by design).
+- ⚠️ Risk: TaxID-typo receipts skip the hold via Tier 1 — accepted, Dual-run + Negative Examples are the backstop.
+
+**Related:**
+- CONTEXT.md (Conflict, Canonical Vendor Lookup, Review Decision), `src/kb-resolver.ts`, tests C1–C3
+
+---
+
+## 2026-09-16 (eve): Builder/Desk split + EOD feedback loop
+
+**Status:** Accepted
+
+**Context:**
+Coding-agent duties and accountant-facing duties ran in one undifferentiated session; EOD quality notes had nowhere to land except chat history, so Builder never reliably received them.
+
+**Decision:**
+Split by session/tools, not personas: Builder (full tools, DEV only, no client files) vs Desk (run CLI + read + ask; may write only `feedback/YYYY-MM-DD.md`). Daily flow in `workspace/daily-routine.md`. Evening close ends with a fixed 3-question quality review (`ask_user_question`, one call) appended to that day's feedback file as `- [ ]` items; Builder triages them next session (`- [x]` + fix ref, never delete).
+
+**Consequences:**
+- ✅ Positive: duties separable in practice; feedback survives session end.
+- ⚠️ Risk: feedback rots if Builder never triages — mitigated by making it step 1 of Builder session start (AGENTS.md).
+
+**Related:**
+- workspace/daily-routine.md, workspace/AGENTS.md (Modes), .pi/skills/autoacct-ops/SKILL.md (EOD review)
+
+---
+
+## 2026-09-16 (pm): Decision capture via Pi questions, not copy-paste template
+
+**Status:** Accepted (amends the 2026-09-16 "No accountant UI" entry)
+
+**Context:**
+The read-only report + markdown reply template still makes the accountant do clerical work (copy block, fill, paste). Pi's harness already has `ask_user_question` — structured on-screen questions with options + free-typing row.
+
+**Decision:**
+Primary channel: Pi asks (verdict first, then conditional follow-up: conflict side-pick / corrections / reason), one case per call, options sourced only from the review JSON + KB refs, at most 1 neutral reason preset. Markdown template and the report's reply block become async/offline fallback. US13 boundary unchanged: captured answers are acknowledged, never written back.
+
+**Consequences:**
+- ✅ Positive: fewer steps, no format errors, reason captured as typed.
+- ⚠️ Risk: Pi inventing options — mitigated by skill rules (no invented account codes, no leading reason presets, tool limits pinned).
+
+**Related:**
+- .pi/skills/autoacct-ops/SKILL.md (Decision Capture)
+- workspace/review-reply.template.md (fallback)
+
+---
+
+## 2026-09-16: No accountant UI — disposable read-only review HTML per hard case
+
+**Status:** Accepted
+
+**Context:**
+Needs-review cases (conflict mapping, Negative Example, low-conf) need human judgment, but posting stays in Dhanakom desktop (Bridge file handoff, legacy stands during pilot) and review presentation is already Pi's read-only job (autoacct-ops skill: Thai summary, must not mutate). A production UI would duplicate both and add auth/audit burden with no volume to justify it.
+
+**Decision:**
+No UI for accountants. For hard cases, generate a single self-contained read-only HTML report from `needs-review/*.json` (`npm run report -- --review <dir> --out <file> [--audit audit.log.jsonl]`, impl `workspace/src/review-report.ts`): zero-JS, no external refs, escaped output, disposable — case closed means the file may be deleted. `audit.log.jsonl` remains the real trace.
+
+**Rationale:**
+Middle path per effective-html philosophy (fat artifact for one decision, not an app): decision-shaped artifact beats chat walls for spatial/comparative review, without maintenance cost. Tests R1–R3 pin zero-script output, escaping, and CLI wiring.
+
+**Consequences:**
+- ✅ Positive: reviewer gets a clear Thai case sheet; no new maintained surface, no keys, no posting path.
+- ❌ Negative: multi-case triage still manual (one file per batch, no queue/state).
+- ⚠️ Risk: someone treats the report as source of truth — mitigated by on-page "read-only, audit log is real" footer.
+
+**Revisit when:**
+needs-review volume exceeds chat review, multiple reviewers need queue/permissions, or post-pilot posting leaves Dhanakom.
+
+**Related:**
+- CONTEXT.md (Candidate, Edge Log, Dhanakom Bridge, Dual-run)
+- .pi/skills/autoacct-ops/SKILL.md (Read-Only Review)
+- docs/production-readiness.md (read-only exception inspection)
+
+---
+
 ## Decision Format
 
 Each decision uses this template:
