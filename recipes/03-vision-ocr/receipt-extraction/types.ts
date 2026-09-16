@@ -31,7 +31,10 @@ export interface ReceiptOcrResult {
   
   /** Merchant/vendor name */
   vendorName: string | null;
-  
+
+  /** 13-digit Thai Tax ID, null if not present or unreadable */
+  taxId?: string | null;
+
   /** Issue date in ISO 8601 format (YYYY-MM-DD) */
   issueDate: string | null;
   

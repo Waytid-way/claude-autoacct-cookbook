@@ -4,6 +4,7 @@ import { join, basename } from 'node:path';
 import type { ReceiptOcrResult } from '../../recipes/03-vision-ocr/receipt-extraction/types.ts';
 import type { JournalEntry, ValidatedReceipt } from './contract.ts';
 import { gate } from './gate.ts';
+import { resolveAccounts, type ClientKnowledge } from './kb-resolver.ts';
 
 // Boundary seam: OCR ด้านนอกถูก inject ผ่าน OcrFn — test ใช้ mock เท่านั้น ห้ามยิง network/pi CLI
 export type OcrFn = (
@@ -18,6 +19,7 @@ export interface RunPipelineOptions {
   auditFile: string;
   ocr: OcrFn;
   minConf?: number;
+  clientKb?: ClientKnowledge;
   expenseAcct?: string;
   cashAcct?: string;
 }
@@ -151,7 +153,8 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
       try {
         const { result, model, baseAmountSatang } = await opts.ocr(join(opts.inboxDir, f), correlationId);
         const v = validate(result, correlationId, baseAmountSatang);
-        const d = gate(v, opts.minConf);
+        const resolved = opts.clientKb ? resolveAccounts(v, opts.clientKb) : undefined;
+        const d = gate(v, opts.minConf, resolved);
         log({ stage: 'ocr', model, sha256, amountSatang: v.amountSatang, confidence: v.confidence });
         if (d.verdict === 'needs-review') {
           writeReviewFile(opts.reviewDir, correlationId, f, d.reasons, v, model);
@@ -164,7 +167,9 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
         const vat = v.vatAmountSatang;
         const date = v.issueDate;
         if (total == null || vat == null || date == null) throw new Error('unreachable: gate passed with missing total/vat/date');
-        const journal = mapToJournal(v, total, date, opts.expenseAcct ?? DEFAULT_EXPENSE_ACCT, opts.cashAcct ?? DEFAULT_CASH_ACCT);
+        const expenseAcct = resolved?.expenseAcct ?? opts.expenseAcct ?? DEFAULT_EXPENSE_ACCT;
+        const cashAcct = resolved?.cashAcct ?? opts.cashAcct ?? DEFAULT_CASH_ACCT;
+        const journal = mapToJournal(v, total, date, expenseAcct, cashAcct);
         writeFileSync(
           join(opts.outboxDir, `${correlationId}.json`),
           JSON.stringify(
@@ -176,6 +181,7 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
               vatSatang: vat,
               totalBaht: total / 100,
               vatBaht: vat / 100,
+              taxId: v.taxId ?? null,
               journal,
               ocrModel: model,
             },
