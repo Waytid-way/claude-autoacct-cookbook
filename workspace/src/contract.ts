@@ -32,6 +32,7 @@ export interface ExportArtifact {
   issueDate: string | null;
   totalSatang: number; // authoritative — Baht below is display-only
   vatSatang: number | null; // authoritative
+  taxId?: string | null;
   totalBaht: number; // display-only, derived
   vatBaht: number | null; // display-only, derived
   journal: JournalEntry;

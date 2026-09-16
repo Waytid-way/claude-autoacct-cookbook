@@ -181,6 +181,7 @@ export async function runPipeline(opts: RunPipelineOptions): Promise<PipelineSum
               vatSatang: vat,
               totalBaht: total / 100,
               vatBaht: vat / 100,
+              taxId: v.taxId ?? null,
               journal,
               ocrModel: model,
             },

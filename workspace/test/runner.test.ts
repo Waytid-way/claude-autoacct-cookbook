@@ -12,6 +12,7 @@ import type { ExportArtifact } from '../src/contract.ts';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 interface Sandbox {
+  dir: string;
   inboxDir: string;
   outboxDir: string;
   reviewDir: string;
@@ -21,6 +22,7 @@ interface Sandbox {
 function sandbox(): Sandbox {
   const base = mkdtempSync(join(tmpdir(), 'autoacct-'));
   const sb: Sandbox = {
+    dir: base,
     inboxDir: join(base, 'inbox'),
     outboxDir: join(base, 'outbox'),
     reviewDir: join(base, 'review'),
@@ -310,6 +312,8 @@ test('Client KB: Normalized vendor name match → journal ลงบัญชี�
   assert.deepEqual(art.journal.lines.map((l) => l.accountCode), ['5200-CONVENIENCE-EXP', '1000-CASH']);
 });
 
+import { exportDhanakomBatch } from '../src/dhanakom-bridge.ts';
+
 test('Client KB: Unknown vendor → gate needs-review (unknown vendor)', async () => {
   const sb = sandbox();
   const ocr: OcrFn = async () => ({
@@ -331,4 +335,62 @@ test('Client KB: Unknown vendor → gate needs-review (unknown vendor)', async (
   const review = JSON.parse(readFileSync(join(sb.reviewDir, reviewFiles[0]), 'utf8')) as { reasons: string[] };
   assert.ok(review.reasons.includes('unknown vendor'));
 });
+
+// (13) Dhanakom Bridge: Batch Export + Audit Idempotency
+test('Dhanakom Bridge: export unexported outbox files to CSV with audit idempotency', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    result: {
+      amountSatang: 10700, currency: 'THB', vatAmountSatang: 700,
+      vendorName: 'Office Depot', taxId: '1234567890123',
+      issueDate: '2026-09-14', confidence: 0.95, rawText: 't',
+    },
+    baseAmountSatang: 10000,
+  });
+
+  // 1. Run pipeline to produce 1 outbox entry
+  const summary = await runPipeline({ ...sb, ocr });
+  assert.equal(summary.passed, 1);
+
+  const outboxFiles = readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json'));
+  assert.equal(outboxFiles.length, 1);
+
+  // 2. Export first time -> 1 exported, 0 skipped
+  const csvPath = join(sb.dir, 'dhanakom-batch-1.csv');
+  const res1 = exportDhanakomBatch({
+    outboxDir: sb.outboxDir,
+    auditFile: sb.auditFile,
+    outputCsvPath: csvPath,
+    batchId: 'B001',
+  });
+
+  assert.equal(res1.exportedCount, 1);
+  assert.equal(res1.skippedCount, 0);
+  assert.ok(existsSync(csvPath));
+
+  const csvContent = readFileSync(csvPath, 'utf8');
+  assert.ok(csvContent.includes('Date,VoucherRef,AccountCode,Debit,Credit,Description,TaxId'));
+  assert.ok(csvContent.includes('5000-MEALS,107.00,0.00'));
+  assert.ok(csvContent.includes('1000-CASH,0.00,107.00'));
+  assert.ok(csvContent.includes('1234567890123'));
+
+  // 3. Re-run exporter on same outbox -> 0 exported, 1 skipped (Idempotent!)
+  const csvPath2 = join(sb.dir, 'dhanakom-batch-2.csv');
+  const res2 = exportDhanakomBatch({
+    outboxDir: sb.outboxDir,
+    auditFile: sb.auditFile,
+    outputCsvPath: csvPath2,
+    batchId: 'B002',
+  });
+
+  assert.equal(res2.exportedCount, 0);
+  assert.equal(res2.skippedCount, 1);
+  assert.ok(!existsSync(csvPath2)); // No file created when nothing to export
+
+  // 4. Verify outbox files remained untouched (immutability)
+  const outboxFilesAfter = readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json'));
+  assert.deepEqual(outboxFiles, outboxFilesAfter);
+});
+
 
