@@ -33,7 +33,77 @@ Why did we make this decision? What alternatives did we consider?
 
 ---
 
-## 2026-09-13: Thermo hardening round (3 blockers)
+## 2026-09-14: Client KB Resolution Seam & Dhanakom Batch Exporter
+
+**Status:** Accepted
+
+**Context:**
+ระบบ AutoAcct ปัจจุบันมี default account code แบบ hardcoded (`5000-MEALS`, `1000-CASH`) และบันทึกผลลัพธ์ของสมุดรายวันเป็น JSON รายตัวใน `outbox/` ซึ่งยังไม่รองรับ multi-client chart of accounts และยังไม่สามารถนำเข้าโปรแกรมบัญชี Dhanakom Desktop ได้โดยตรง
+
+**Decision:**
+1. แยกการผูกบัญชีเป็น `kb-resolver` module รับ `(clientContext, validatedReceipt)` ส่งกลับ account codes เพื่อตัดขาดความรับผิดชอบด้านผังบัญชีออกจาก core pipeline และไม่ให้ LLM เดาผังบัญชีเอง
+2. Dhanakom Bridge จะอยู่ในรูป batch export script แยกต่างหาก โดยรวบรวม validated journal JSONs จาก `outbox/` แล้วแปลงเป็น CSV/Excel ตาม format ของ Dhanakom
+
+**Rationale:**
+- Core extraction & validation pipeline ต้องไม่ผูกติดกับรูปแบบไฟล์เฉพาะทางของซอฟต์แวร์บัญชีปลายทาง
+- แยก deterministic rule lookup (Client KB) ออกจาก OCR / AI extraction อย่างเด็ดขาดตามหลัก "AI proposes; control system decides"
+
+**Consequences:**
+- ✅ Positive: Pipeline สะอาด, ทดสอบแยกส่วนได้ง่าย, เพิ่มปลายทางระบบบัญชีอื่นได้ในอนาคตโดยไม่แตะ pipeline
+- ❌ Negative: มีขั้นตอนรัน batch export เพิ่มขึ้นหนึ่งขั้นตอนแทนที่จะได้ไฟล์ Dhanakom ทันทีใน pipeline run
+- ⚠️ Risk: การ mapping vendor ที่ไม่เคยพบใน KB จะต้องมี fallback policy ที่ชัดเจนว่าจะลงบัญชีพัก (Suspense Account) หรือเด้งเข้า `needs-review`
+
+---
+
+## 2026-09-14: Unknown Vendor Fail-Safe, Bridge Idempotency, and Edge Log Promotion
+
+**Status:** Accepted
+
+**Context:**
+เมื่อแยก `kb-resolver` และ Dhanakom Bridge ออกมา มี 3 คำถามเชิง lifecycle และ safety:
+1. กรณีเจอ vendor ที่ไม่มีใน KB จะตัดสินใจอย่างไร
+2. การรัน Dhanakom Batch Exporter จะป้องกันการ export ซ้ำได้อย่างไรโดยไม่ทำลาย immutability ของ `outbox/`
+3. การเรียนรู้ย้อนกลับเมื่อมนุษย์แก้ไขเคสใน `needs-review` จะไหลเข้า KB อย่างไร
+
+**Decision:**
+1. **Unknown Vendor:** ตีเป็น `needs-review` ทันทีตั้งแต่ Gate หากไม่พบ mapping ที่เชื่อถือได้ใน KB (ไม่ลง Suspense Account อัตโนมัติ)
+2. **Bridge Lifecycle:** ใช้ Audit-driven Idempotency — บันทึก `stage: "bridge-export"` พร้อม batch ID ลงใน `audit.log` กลาง ห้ามย้าย/แก้ชื่อไฟล์ใน `outbox/`
+3. **KB Edge Log Loop:** การแก้ไขจาก human review จะเข้าสู่ Edge Log ในฐานะ `Candidate` ก่อน และต้องได้รับการยืนยันจาก Senior Accountant เพื่อเลื่อนสถานะเป็น `Trusted`
+
+**Rationale:**
+- ความปลอดภัยทางบัญชีมาก่อน (Safe-by-Default): ผิดผังบัญชีหรือหมวดภาษีสร้างค่าปรับย้อนหลังสูงกว่า delay ในการตรวจ
+- Filesystem immutability ป้องกัน race conditions และทำให้ audit trail เป็น single source of truth
+- ตรงกับนิยาม Ubiquitous Language ใน `CONTEXT.md` ว่าสิ่งที่ยังไม่ผ่านการอนุมัติระดับสูง ห้ามนำมาอ้างอิงเป็นความจริง (Trusted)
+
+**Consequences:**
+- ✅ Positive: ปลอดภัย ไม่ลงบัญชีมั่ว, audit trail ตรวจสอบย้อนกลับได้สมบูรณ์, KB มีคุณภาพสูงเพราะผ่านการกลั่นกรอง
+- ❌ Negative: ช่วง onboard ลูกค้าใหม่จะมีรายการเข้า `needs-review` สูงจนกว่า Edge Log / Vendor Map จะนิ่ง
+- ⚠️ Risk: คอขวดที่ Senior Reviewer หากไม่มี UI หรือกระบวนการ approve Candidate ที่คล่องตัว
+
+---
+
+## 2026-09-14: KB Resolver Seam Contract and Tax ID Canonical Lookup
+
+**Status:** Accepted
+
+**Context:**
+ต้องการกำหนด Interface ระหว่าง Core Pipeline กับ `kb-resolver` รวมถึงกลยุทธ์การจับคู่ชื่อผู้ขาย (Vendor Matching) ที่มีความผันแปรสูงบนหัวใบเสร็จ
+
+**Decision:**
+1. **Resolver Interface:** ฟังก์ชัน `resolveAccounts(receipt: ValidatedReceipt, clientKb: ClientKnowledge): { expenseAcct: string; cashAcct: string } | null` — หากคืน `null` จะถือว่าไม่พบ mapping และส่งต่อให้ Gate ตัดสินเป็น `needs-review`
+2. **Deterministic Lookup Hierarchy:** ยึด Tax ID 13 หลัก (เลขประจำตัวผู้เสียภาษี) เป็น Primary Lookup Key; หากไม่มี Tax ID จึง fallback ไปยัง Normalized / Regex Vendor Name table ใน Client KB
+
+**Rationale:**
+- คงหลักการ Separation of Concerns: `kb-resolver` มีหน้าที่ชี้ Account Code เท่านั้น การจัดยอดเดบิต/เครดิตและคำนวณภาษียังอยู่ที่ Pipeline
+- Tax ID เป็นตัวระบุนิติบุคคลที่แน่นอนที่สุดในระบบภาษีไทย ขจัดปัญหาชื่อย่อ/สาขา/การสะกดผิดโดยไม่ต้องพึ่งพา fuzzy/semantic matching ที่ควบคุมไม่ได้
+
+**Consequences:**
+- ✅ Positive: Interface เล็ก กระชับ เทสง่าย ไม่มี side effects; การ match vendor มีความแม่นยำสูงระดับ 100% เมื่อมี Tax ID
+- ❌ Negative: บิลที่ OCR ไม่สามารถอ่าน Tax ID ได้ หรือบิลเงินสดขนาดเล็กที่ไม่มี Tax ID จะต้องพึ่งพาชื่อทางการค้า ซึ่งอาจหลุดเข้า review บ่อยขึ้น
+- ⚠️ Risk: เอกสารที่ Tax ID ถูกอ่านผิดหลักเดียวอาจ match ไม่เจอ หรือ match ผิด (แก้ด้วย checksum validation ของเลข 13 หลัก)
+
+---
+
 
 **Status:** Accepted
 

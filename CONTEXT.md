@@ -63,3 +63,16 @@ _Avoid_: พอ, enough (bare)
 **Trusted**:
 Knowledge that passed validation gates plus human authority, with valid period and evidence refs. Anything below is OBSERVED or VALIDATED at best — never cited as truth.
 _Avoid_: verified (vague), approved (that's a decision event, not knowledge state)
+
+**Candidate**:
+A newly resolved vendor mapping or accounting oddity derived from a human review action in `needs-review`, pending senior accountant validation before becoming Trusted in the Edge Log.
+_Avoid_: Draft rule, pending mapping
+
+**Canonical Vendor Lookup**:
+The two-tier deterministic resolution order: (1) 13-digit Thai Tax ID match, (2) normalized vendor name string match. Never semantic/fuzzy match without evidence.
+_Avoid_: Smart vendor search, AI vendor guesser
+
+**Bridge-Export**:
+The audit event recording that a validated journal entry in `outbox/` was included in a Dhanakom export batch. Prevents duplicate exports while preserving file immutability.
+_Avoid_: mark as exported, move to archive
+

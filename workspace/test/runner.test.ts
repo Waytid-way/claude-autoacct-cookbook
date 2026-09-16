@@ -261,3 +261,74 @@ test('บัญชี custom → journal ลงตาม options', async () => {
   const defArtifact = JSON.parse(readFileSync(join(sbDefault.outboxDir, defFiles[0]), 'utf8')) as ExportArtifact;
   assert.deepEqual(defArtifact.journal.lines.map((l) => l.accountCode), ['5000-MEALS', '1000-CASH']);
 });
+
+// (12) Client KB: Tax ID match, normalized name match, และ unknown vendor ตก needs-review
+test('Client KB: Tax ID match ตรงเป๊ะ → journal ลงบัญชีตาม KB', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    result: {
+      amountSatang: 10700, currency: 'THB', vatAmountSatang: 700,
+      vendorName: 'SOME UNKNOWN BRANCH NAME', taxId: '0-1055-58000-12-3',
+      issueDate: '2026-09-14', confidence: 0.95, rawText: 't',
+    },
+    baseAmountSatang: 10000,
+  });
+  const clientKb = {
+    clientName: 'Client Alpha',
+    defaultCashAcct: '1111-PETTY-CASH',
+    vendorMappings: [
+      { taxId: '0105558000123', expenseAcct: '5100-OFFICE-SUPPLIES' },
+    ],
+  };
+  const summary = await runPipeline({ ...sb, ocr, clientKb });
+  assert.equal(summary.passed, 1);
+  const files = readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json'));
+  const art = JSON.parse(readFileSync(join(sb.outboxDir, files[0]), 'utf8')) as ExportArtifact;
+  assert.deepEqual(art.journal.lines.map((l) => l.accountCode), ['5100-OFFICE-SUPPLIES', '1111-PETTY-CASH']);
+});
+
+test('Client KB: Normalized vendor name match → journal ลงบัญชีตาม KB', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    result: {
+      amountSatang: 50000, currency: 'THB', vatAmountSatang: 3271,
+      vendorName: '  CP   ALL (Public) Co., Ltd.  ',
+      issueDate: '2026-09-14', confidence: 0.95, rawText: 't',
+    },
+  });
+  const clientKb = {
+    vendorMappings: [
+      { vendorNamePattern: 'cp all', expenseAcct: '5200-CONVENIENCE-EXP', cashAcct: '1000-CASH' },
+    ],
+  };
+  const summary = await runPipeline({ ...sb, ocr, clientKb });
+  assert.equal(summary.passed, 1);
+  const files = readdirSync(sb.outboxDir).filter((f) => f.endsWith('.json'));
+  const art = JSON.parse(readFileSync(join(sb.outboxDir, files[0]), 'utf8')) as ExportArtifact;
+  assert.deepEqual(art.journal.lines.map((l) => l.accountCode), ['5200-CONVENIENCE-EXP', '1000-CASH']);
+});
+
+test('Client KB: Unknown vendor → gate needs-review (unknown vendor)', async () => {
+  const sb = sandbox();
+  const ocr: OcrFn = async () => ({
+    model: 'mock',
+    result: {
+      amountSatang: 20000, currency: 'THB', vatAmountSatang: 1308,
+      vendorName: 'MYSTERY VENDOR', taxId: '9999999999999',
+      issueDate: '2026-09-14', confidence: 0.95, rawText: 't',
+    },
+  });
+  const clientKb = {
+    vendorMappings: [
+      { taxId: '0105558000123', expenseAcct: '5100-OFFICE' },
+    ],
+  };
+  const summary = await runPipeline({ ...sb, ocr, clientKb });
+  assert.equal(summary.needsReview, 1);
+  const reviewFiles = readdirSync(sb.reviewDir).filter((f) => f.endsWith('.json'));
+  const review = JSON.parse(readFileSync(join(sb.reviewDir, reviewFiles[0]), 'utf8')) as { reasons: string[] };
+  assert.ok(review.reasons.includes('unknown vendor'));
+});
+
